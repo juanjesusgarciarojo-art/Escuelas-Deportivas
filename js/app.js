@@ -1392,7 +1392,7 @@ function roleLabelRaw(r) {
             </div>
             <div class="form-group">
               <label class="form-label" style="font-size:10px">TELÉFONO DEL TUTOR (OBLIGATORIO)</label>
-              <input class="form-input" id="nuParentPhone" type="tel" placeholder="Móvil del representante">
+              <input class="form-input" id="nuParentPhone" type="tel" placeholder="6XXXXXXXX" maxlength="9" oninput="validatePhone(this)">
             </div>
           </div>
 
