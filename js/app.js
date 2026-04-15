@@ -176,12 +176,23 @@ async function getTeams() {
   if (IS_DEMO_MODE) return [...DEMO_DATA.teams];
   try {
     const isAdminOrCoach = ['admin','coach'].includes(APP.userData.role);
+    let teamsData = [];
+    
     if (!isAdminOrCoach && APP.userData.teamId) {
       const d = await db.collection('teams').doc(APP.userData.teamId).get();
-      return d.exists ? [{ id:d.id, ...d.data() }] : [];
+      if (d.exists) teamsData = [{ id:d.id, ...d.data() }];
+    } else {
+      const snap = await db.collection('teams').where('active','==',true).get();
+      teamsData = snap.docs.map(d => ({ id:d.id, ...d.data() }));
     }
-    const snap = await db.collection('teams').where('active','==',true).get();
-    return snap.docs.map(d => ({ id:d.id, ...d.data() }));
+
+    // Dynamic Player Count Update
+    const result = await Promise.all(teamsData.map(async (t) => {
+      const pSnap = await db.collection('players').where('teamId','==',t.id).where('active','==',true).get();
+      return { ...t, playerCount: pSnap.size };
+    }));
+
+    return result;
   } catch(e) { console.error(e); return []; }
 }
 
@@ -224,9 +235,19 @@ async function getMessages() {
 async function getNews() {
   if (IS_DEMO_MODE) return [...DEMO_DATA.news];
   try {
-    const snap = await db.collection('news').orderBy('date','desc').limit(10).get();
-    return snap.docs.map(d => ({ id:d.id, ...d.data() }));
-  } catch(e) { return []; }
+    const role = APP.userData.role;
+    const tId  = APP.userData.teamId;
+    
+    let q = db.collection('news').orderBy('date','desc').limit(15);
+    const snap = await q.get();
+    const allNews = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+
+    // If admin or coach, see global and ALL team news (to manage)
+    if (['admin','coach'].includes(role)) return allNews;
+
+    // If player, filter to see only 'all' or their specific team
+    return allNews.filter(n => n.target === 'all' || n.target === tId);
+  } catch(e) { console.error("Error cargando noticias:", e); return []; }
 }
 
 // ===================== UTILITY =====================
@@ -2039,39 +2060,57 @@ async function renderAdminPermissions(container) {
   };
 }
 
-// ===================== VIEW: ADMIN NEWS =====================
 async function renderAdminNews(container) {
   let selIcon = '📣';
+  const teams = await getTeams();
   container.innerHTML = `
     <button class="back-btn" onclick="goBack()">‹ Panel Admin</button>
     <div class="section-header">
-      <div><div class="section-title">Nueva noticia</div></div>
+      <div><div class="section-title">Nueva publicación</div><div class="section-subtitle">Gestiona noticias y fotos</div></div>
     </div>
     <div class="card">
       <div class="card-body">
-        <div class="form-group" style="margin-bottom:14px">
-          <label class="form-label" style="font-size:11px">ÍCONO</label>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            ${['🏆','📣','🏀','📅','⚡','🎉','📢','ℹ️','🌟','💢'].map((ic,i) => `
-              <button class="iconBtn" onclick="pickIcon('${ic}',this)"
-                style="width:44px;height:44px;font-size:24px;border-radius:10px;border:2px solid ${i===1?'var(--primary)':'var(--glass-border)'};background:${i===1?'rgba(255,107,44,0.12)':'var(--glass)'};cursor:pointer;transition:all .2s">${ic}</button>`).join('')}
+        
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding:12px;background:rgba(255,255,255,0.03);border-radius:16px;border:1px solid rgba(255,255,255,0.05)">
+          <div id="newsPhotoPreview" style="width:70px;height:70px;border-radius:12px;background:var(--glass);display:flex;align-items:center;justify-content:center;font-size:24px;border:2px dashed rgba(255,255,255,0.2);overflow:hidden;flex-shrink:0">📸</div>
+          <div style="flex:1">
+            <label class="form-label" style="margin-bottom:4px">FOTO DEL EVENTO/EQUIPO</label>
+            <input type="file" id="newsPhotoInput" accept="image/*" style="font-size:12px;color:rgba(255,255,255,0.5)" onchange="previewPhoto(this, 'newsPhotoPreview')">
           </div>
         </div>
+
         <div class="form-group" style="margin-bottom:14px">
-          <label class="form-label" style="font-size:11px">CATEGORÍA</label>
-          <select class="form-input" id="newsCat" style="-webkit-appearance:none">
-            ${['Resultado','Club','Torneo','Equipación','Horarios','General'].map(c=>`<option>${c}</option>`).join('')}
+          <label class="form-label" style="font-size:11px">ENVIAR A:</label>
+          <select class="form-input" id="newsTarget" style="-webkit-appearance:none">
+            <option value="all">📢 Todo el Club (Público)</option>
+            ${teams.map(t => `<option value="${t.id}">👥 Solo al ${t.name}</option>`).join('')}
           </select>
         </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+          <div class="form-group">
+            <label class="form-label" style="font-size:11px">ÍCONO</label>
+            <select class="form-input" id="newsIcon">
+              ${['📣','🏆','🏀','📅','⚡','🎉','📢','ℹ️','🌟'].map(ic => `<option>${ic}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="font-size:11px">CATEGORÍA</label>
+            <select class="form-input" id="newsCat">
+              ${['Resultado','Club','Torneo','FOTOS','Aviso','Próximo'].map(c=>`<option>${c}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+
         <div class="form-group" style="margin-bottom:14px">
           <label class="form-label" style="font-size:11px">TÍTULO</label>
-          <input class="form-input" id="newsTitle" type="text" placeholder="Título de la noticia">
+          <input class="form-input" id="newsTitle" type="text" placeholder="Ej: ¡Campeones de Copa!">
         </div>
         <div class="form-group" style="margin-bottom:20px">
           <label class="form-label" style="font-size:11px">CONTENIDO</label>
-          <textarea class="form-input" id="newsBody" rows="6" placeholder="Escribe el contenido aquí…" style="resize:none;line-height:1.6"></textarea>
+          <textarea class="form-input" id="newsBody" rows="5" placeholder="Cuéntanos qué ha pasado…" style="resize:none;line-height:1.6"></textarea>
         </div>
-        <button class="btn-full btn-primary-full" onclick="publishNews()">📰 Publicar noticia</button>
+        <button class="btn-full btn-primary-full" onclick="publishNews()">📰 Publicar en la App</button>
       </div>
     </div>
     <div style="height:16px"></div>`;
@@ -2087,9 +2126,19 @@ async function renderAdminNews(container) {
     const title = document.getElementById('newsTitle').value.trim();
     const body  = document.getElementById('newsBody').value.trim();
     const cat   = document.getElementById('newsCat').value;
+    const target= document.getElementById('newsTarget').value;
+    const icon  = document.getElementById('newsIcon').value;
+    const photo = document.getElementById('newsPhotoInput').dataset.base64 || null;
+
     if (!title||!body) { showToast('Completa título y contenido','error'); return; }
-    if (!IS_DEMO_MODE) await db.collection('news').add({ icon:selIcon, category:cat, title, body, date:firebase.firestore.FieldValue.serverTimestamp() });
-    showToast('Noticia publicada ✓','success');
+    
+    if (!IS_DEMO_MODE) {
+      await db.collection('news').add({ 
+        icon, category:cat, title, body, target, photo,
+        date:firebase.firestore.FieldValue.serverTimestamp() 
+      });
+    }
+    showToast('¡Noticia publicada con éxito! ✓','success');
     goBack();
   };
 }
