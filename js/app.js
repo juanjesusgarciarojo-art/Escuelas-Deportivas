@@ -1772,6 +1772,20 @@ async function renderAdminTeams(container) {
             <label class="form-label">NOMBRE DEL EQUIPO</label>
             <input class="form-input" id="etName" type="text" value="${team.name}">
           </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+            <div class="form-group">
+              <label class="form-label">CATEGORÍA</label>
+              <select class="form-input" id="etCat">
+                ${['Escuela','Benjamín','Alevín','Infantil','Cadete','Junior','Senior','Veteranos'].map(c=>`<option ${team.category===c?'selected':''}>${c}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">GÉNERO</label>
+              <select class="form-input" id="etGender">
+                ${['Masculino','Femenino','Mixto'].map(g=>`<option ${team.gender===g?'selected':''}>${g}</option>`).join('')}
+              </select>
+            </div>
+          </div>
           <div class="form-group" style="margin-bottom:20px">
             <label class="form-label">ENTRENADOR/A</label>
             <select class="form-input" id="etCoach">
@@ -1798,10 +1812,12 @@ async function renderAdminTeams(container) {
   };
 
   window.updateTeam = async (teamId) => {
-    const name  = document.getElementById('etName').value.trim();
-    const coach = document.getElementById('etCoach').value;
+    const name   = document.getElementById('etName').value.trim();
+    const cat    = document.getElementById('etCat').value;
+    const gender = document.getElementById('etGender').value;
+    const coach  = document.getElementById('etCoach').value;
     if (!name) return;
-    if (!IS_DEMO_MODE) await db.collection('teams').doc(teamId).update({ name, coachName:coach });
+    if (!IS_DEMO_MODE) await db.collection('teams').doc(teamId).update({ name, category:cat, gender, coachName:coach });
     _closeModal();
     showToast('Equipo actualizado ✓','success');
     renderAdminTeams(document.getElementById('appMain'));
@@ -1821,7 +1837,7 @@ async function renderAdminTeams(container) {
             <label class="form-label">SELECCIONAR USUARIO REGISTRADO</label>
             <select class="form-input" id="apUserSelect" onchange="updateAddPlayerPreview(this.value)">
               <option value="">Selecciona un jugador/a...</option>
-              ${users.map(u => `<option value="${u.id}" data-birth="${u.birthDate||''}" data-guardian="${u.guardian||''}" data-name="${u.name}">${u.name} (${u.email})</option>`).join('')}
+              ${users.map(u => `<option value="${u.id}" data-birth="${u.birth||''}" data-guardian="${u.guardian||''}" data-name="${u.name}">${u.name} (${u.email})</option>`).join('')}
             </select>
           </div>
 
@@ -1844,6 +1860,7 @@ async function renderAdminTeams(container) {
             <div class="form-group">
               <label class="form-label">POSICIÓN</label>
               <select class="form-input" id="apPos">
+                <option value="Sin definir">Sin definir</option>
                 <option>Base</option><option>Escolta</option><option>Alero</option><option>Ala-Pívot</option><option>Pívot</option>
               </select>
             </div>
@@ -1885,16 +1902,27 @@ async function renderAdminTeams(container) {
     const age = birth ? calcAge(birth) : 0;
 
     if (!IS_DEMO_MODE) {
-      // Create player profile
-      await db.collection('players').add({
+      // 1. Update user record to link back to team
+      await db.collection('users').doc(uid).update({ teamId });
+      
+      // 2. Update or Create player profile (to avoid duplicates)
+      const psnap = await db.collection('players').where('uid','==',uid).get();
+      const pData = {
         uid, name, age, number:num, position:pos, teamId,
         guardian: age < 18 ? guardian : null,
         active:true,
         stats:{ pts:0, reb:0, ast:0, stl:0, blk:0, to:0, pf:0, reb_off:0, reb_def:0 },
-        createdAt:firebase.firestore.FieldValue.serverTimestamp()
-      });
-      // Also update user record to link back to team
-      await db.collection('users').doc(uid).update({ teamId });
+        updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+      };
+
+      if (!psnap.empty) {
+        // Update existing profile (keeping stats if they exist)
+        await psnap.docs[0].ref.update({ name, age, number:num, position:pos, teamId, guardian, active:true });
+      } else {
+        // Create new profile
+        pData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        await db.collection('players').add(pData);
+      }
     }
     
     _closeModal();
