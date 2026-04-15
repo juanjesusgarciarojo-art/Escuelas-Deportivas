@@ -1119,14 +1119,22 @@ async function renderMessageDetail(container, { msgId }) {
 }
 
 // ===================== VIEW: PROFILE =====================
-function renderProfile(container) {
+async function renderProfile(container) {
   const u = APP.userData;
+  let teamName = 'Sin equipo';
+  
+  if (u.teamId) {
+    const teams = await getTeams();
+    const t = teams.find(x => x.id === u.teamId);
+    if (t) teamName = t.name;
+  }
+
   container.innerHTML = `
     <div class="profile-header">
       <div class="profile-avatar">${initials(u.name)}</div>
       <div class="profile-name">${u.name}</div>
       <div class="profile-role">${roleLabel()}</div>
-      ${u.teamName ? `<div class="profile-team">🏀 ${u.teamName}</div>` : ''}
+      <div class="profile-team">🏀 ${teamName}</div>
       <div style="margin-top:12px">
         ${IS_DEMO_MODE ? `<span class="tag tag-yellow">⚠️ Modo Demostración</span>` : `<span class="tag tag-green">● Conectado</span>`}
       </div>
@@ -1609,10 +1617,10 @@ function roleLabelRaw(r) {
 
     if (!IS_DEMO_MODE) {
       await db.collection('users').doc(userId).update(data);
-      // Sync photo and name to player profile if it exists
+      // Sync data to player profile if it exists (sports record)
       const psnap = await db.collection('players').where('uid','==',userId).get();
       psnap.forEach(d => {
-        const updateObj = { name: data.name };
+        const updateObj = { name: data.name, teamId: data.teamId };
         if (data.photo) updateObj.photo = data.photo;
         d.ref.update(updateObj);
       });
