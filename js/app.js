@@ -439,7 +439,6 @@ async function renderHome(container) {
 
     <div style="height:16px"></div>`;
 }
-}
 
 // ===================== VIEW: TEAMS =====================
 async function renderTeams(container) {
