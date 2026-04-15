@@ -1427,13 +1427,18 @@ function roleLabelRaw(r) {
 
           <div id="nuPlayerExtra" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
             <div class="form-group">
-              <label class="form-label">DORSAL</label>
+              <label class="form-label">DORSAL (OPCIONAL)</label>
               <input class="form-input" id="nuPlayerNum" type="number" placeholder="Ej: 7">
             </div>
             <div class="form-group">
               <label class="form-label">POSICIÓN</label>
               <select class="form-input" id="nuPlayerPos">
-                <option>Base</option><option>Escolta</option><option>Alero</option><option>Ala-Pívot</option><option>Pívot</option>
+                <option value="Sin definir">Sin definir</option>
+                <option value="Base">Base</option>
+                <option value="Escolta">Escolta</option>
+                <option value="Alero">Alero</option>
+                <option value="Ala-Pívot">Ala-Pívot</option>
+                <option value="Pívot">Pívot</option>
               </select>
             </div>
           </div>
@@ -1481,8 +1486,9 @@ function roleLabelRaw(r) {
     const photo    = document.getElementById('nuPhotoInput').dataset.base64 || null;
 
     // Player extras
-    const pNum     = document.getElementById('nuPlayerNum').value || 0;
-    const pPos     = document.getElementById('nuPlayerPos').value;
+    const pNumInput = document.getElementById('nuPlayerNum').value.trim();
+    const pNum      = pNumInput === '' ? 0 : parseInt(pNumInput);
+    const pPos      = document.getElementById('nuPlayerPos').value;
 
     if (!name||!email||!pass||!birth||!phone) { showToast('Faltan campos obligatorios','error'); return; }
     if (phone.length !== 9) { showToast('El teléfono debe tener 9 números','error'); return; }
