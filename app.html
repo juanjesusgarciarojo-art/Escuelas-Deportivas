@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="Estadísticas Gallardas - Club de Baloncesto">
+  <meta name="theme-color" content="#0D1425">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <title>Estadísticas Gallardas</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ===== HEADER ===== -->
+  <header class="app-header" id="appHeader">
+    <div class="header-left">
+      <div class="header-logo">🏀</div>
+      <div>
+        <div class="header-title" id="headerTitle">Estadísticas Gallardas</div>
+        <div class="header-subtitle" id="headerSubtitle">Cargando...</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div style="position:relative">
+        <button class="header-btn" id="msgHeaderBtn" onclick="navigateTo('messages')" title="Mensajes">💬</button>
+        <div class="unread-badge" id="unreadBadge" style="display:none">0</div>
+      </div>
+      <button class="header-btn" onclick="navigateTo('profile')" title="Perfil">👤</button>
+    </div>
+  </header>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <main class="app-main" id="appMain">
+    <div class="loader" id="initialLoader">
+      <div class="spinner"></div>
+    </div>
+  </main>
+
+  <!-- ===== BOTTOM NAV ===== -->
+  <nav class="bottom-nav" id="bottomNav">
+    <button class="nav-item active" id="nav-home" data-nav="home" onclick="navigateTo('home')">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">Inicio</span>
+    </button>
+    <button class="nav-item" id="nav-teams" data-nav="teams" onclick="navigateTo('teams')">
+      <span class="nav-icon">👥</span>
+      <span class="nav-label">Equipos</span>
+    </button>
+    <button class="nav-item" id="nav-games" data-nav="games" onclick="navigateTo('games')">
+      <span class="nav-icon">🏀</span>
+      <span class="nav-label">Partidos</span>
+    </button>
+    <button class="nav-item" id="nav-messages" data-nav="messages" onclick="navigateTo('messages')">
+      <span class="nav-icon">💬</span>
+      <span class="nav-label">Mensajes</span>
+      <div class="nav-dot" id="msgDot" style="display:none"></div>
+    </button>
+    <button class="nav-item" id="nav-admin" data-nav="admin" onclick="navigateTo('admin')" style="display:none">
+      <span class="nav-icon">⚙️</span>
+      <span class="nav-label">Admin</span>
+    </button>
+    <button class="nav-item" id="nav-profile" data-nav="profile" onclick="navigateTo('profile')">
+      <span class="nav-icon">👤</span>
+      <span class="nav-label">Perfil</span>
+    </button>
+  </nav>
+
+</div><!-- end app-shell -->
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
+</script>
+</body>
+</html>
