@@ -393,36 +393,52 @@ async function renderHome(container) {
       <div class="hero-sub" style="margin-top:8px">${teams.length} equipos activos · Temporada 2024-25</div>
     </div>
 
-    <!-- Quick Stats -->
-    <div class="stats-grid">
-      <div class="stat-card"><div class="stat-value">${finished.length}</div><div class="stat-label">Partidos</div></div>
-      <div class="stat-card"><div class="stat-value">${wins.length}</div><div class="stat-label">Victorias</div></div>
-      <div class="stat-card"><div class="stat-value">${finished.length - wins.length}</div><div class="stat-label">Derrotas</div></div>
-      <div class="stat-card"><div class="stat-value">${upcoming.length}</div><div class="stat-label">Próximos</div></div>
-    </div>
-
-    ${upcoming.length ? `
+    <!-- Noticias del Club (Prioridad Global) -->
+    ${news.length ? `
     <div class="section-header">
+      <div class="section-title" style="font-size:18px">Noticias del Club</div>
+      ${isAdmin ? `<button class="section-action" onclick="navigateTo('admin-news')">+ Nueva</button>` : ''}
+    </div>
+    <div class="news-container">
+      ${news.slice(0,3).map((n, i) => i === 0 ? `
+        <div class="news-card featured" onclick="showNewsDetail('${n.id}')">
+          <div class="news-badge">${n.category}</div>
+          <div class="news-img-hero">${n.photo ? `<img src="${n.photo}">` : '📰'}</div>
+          <div class="news-content">
+            <div class="news-date">${fmtDate(n.date)}</div>
+            <div class="news-title-hero">${n.title}</div>
+            <div class="news-preview-hero">${n.body.substring(0,80)}...</div>
+          </div>
+        </div>
+      ` : newsCardHTML(n)).join('')}
+    </div>` : `
+    <div class="section-header">
+      <div class="section-title" style="font-size:18px">Noticias del Club</div>
+      ${isAdmin ? `<button class="section-action" onclick="navigateTo('admin-news')">+ Nueva</button>` : ''}
+    </div>
+    <div class="empty-state">No hay noticias publicadas recientemente</div>`}
+
+    <!-- Competición -->
+    ${upcoming.length ? `
+    <div class="section-header" style="margin-top:24px">
       <div class="section-title" style="font-size:18px">Próximos partidos</div>
       <button class="section-action" onclick="navigateTo('games')">Ver todos</button>
     </div>
-    ${upcoming.slice(0,2).map(gameCardHTML).join('')}` : ''}
+    <div class="games-list-home">
+      ${upcoming.slice(0,2).map(gameCardHTML).join('')}
+    </div>` : ''}
 
     ${finished.length ? `
-    <div class="section-header">
+    <div class="section-header" style="margin-top:20px">
       <div class="section-title" style="font-size:18px">Últimos resultados</div>
       <button class="section-action" onclick="navigateTo('games')">Ver todos</button>
     </div>
-    ${finished.slice(0,2).map(gameCardHTML).join('')}` : ''}
-
-    ${news.length && APP.permissions.show_news ? `
-    <div class="section-header">
-      <div class="section-title" style="font-size:18px">Noticias del club</div>
-      ${isAdmin ? `<button class="section-action" onclick="navigateTo('admin-news')">+ Nueva</button>` : ''}
-    </div>
-    ${news.slice(0,2).map(newsCardHTML).join('')}` : ''}
+    <div class="results-list-home">
+      ${finished.slice(0,2).map(gameCardHTML).join('')}
+    </div>` : ''}
 
     <div style="height:16px"></div>`;
+}
 }
 
 // ===================== VIEW: TEAMS =====================
@@ -534,7 +550,9 @@ async function renderTeamDetail(container, { teamId }) {
                <div class="player-row" style="cursor:default">
                  <div style="display:flex;align-items:center;flex:1;cursor:pointer" onclick="navigateTo('player-detail',{playerId:'${p.id}',teamId:'${teamId}'})">
                    <div class="player-number">${p.number}</div>
-                   <div class="avatar" style="width:40px;height:40px;font-size:16px">${initials(p.name)}</div>
+                   <div class="avatar" style="width:40px;height:40px;font-size:16px;overflow:hidden">
+                     ${p.photo ? `<img src="${p.photo}" style="width:100%;height:100%;object-fit:cover">` : initials(p.name)}
+                   </div>
                    <div class="player-info">
                      <div class="player-name">${p.name}</div>
                      <div class="player-meta">${p.position} · ${(p.stats?.pts||0).toFixed(1)} pts/par.</div>
@@ -590,8 +608,8 @@ async function renderPlayerDetail(container, { playerId, teamId }) {
     <button class="back-btn" onclick="goBack()">‹ Equipo</button>
 
     <div style="background:linear-gradient(160deg,rgba(255,107,44,0.15) 0%,transparent 60%);padding:24px 16px 16px;text-align:center">
-      <div style="width:84px;height:84px;border-radius:50%;${avatarBg(parseInt(p.number)%5)};display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:900;margin:0 auto 12px;border:3px solid rgba(255,107,44,0.4);box-shadow:0 0 0 6px rgba(255,107,44,0.1)">
-        ${initials(p.name)}
+      <div style="width:100px;height:100px;border-radius:50%;${p.photo?'':'background:var(--glass)'};display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:900;margin:0 auto 12px;border:3px solid rgba(255,107,44,0.4);box-shadow:0 0 0 6px rgba(255,107,44,0.1);overflow:hidden">
+        ${p.photo ? `<img src="${p.photo}" style="width:100%;height:100%;object-fit:cover">` : initials(p.name)}
       </div>
       <div style="font-size:24px;font-weight:900">${p.name}</div>
       <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;flex-wrap:wrap">
@@ -1236,7 +1254,7 @@ async function renderAdmin(container) {
     try {
       const [tsnap, psnap, gsnap, msnap] = await Promise.all([
         db.collection('teams').get(),
-        db.collection('players').get(),
+        db.collection('users').where('role','==','player').get(),
         db.collection('games').get(),
         db.collection('messages').get()
       ]);
@@ -1344,6 +1362,14 @@ function roleLabelRaw(r) {
         <div class="modal-handle"></div>
         <div class="modal-title">Nuevo usuario</div>
         <div class="modal-body" style="padding-bottom:28px">
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding:12px;background:rgba(255,255,255,0.03);border-radius:16px;border:1px solid rgba(255,255,255,0.05)">
+            <div id="nuPhotoPreview" style="width:64px;height:64px;border-radius:50%;background:var(--glass);display:flex;align-items:center;justify-content:center;font-size:24px;border:2px dashed rgba(255,255,255,0.2);overflow:hidden;flex-shrink:0">📸</div>
+            <div style="flex:1">
+              <label class="form-label" style="margin-bottom:4px">FOTO DE PERFIL</label>
+              <input type="file" id="nuPhotoInput" accept="image/*" style="font-size:12px;color:rgba(255,255,255,0.5)" onchange="previewPhoto(this, 'nuPhotoPreview')">
+            </div>
+          </div>
+
           <div class="form-group" style="margin-bottom:12px">
             <label class="form-label">NOMBRE Y APELLIDOS</label>
             <input class="form-input" id="nuName" type="text" placeholder="Nombre completo">
@@ -1355,7 +1381,7 @@ function roleLabelRaw(r) {
             </div>
             <div class="form-group">
               <label class="form-label">MI TELÉFONO</label>
-              <input class="form-input" id="nuPhone" type="tel" placeholder="Nº de contacto">
+              <input class="form-input" id="nuPhone" type="tel" placeholder="6XXXXXXXX" maxlength="9" oninput="validatePhone(this)">
             </div>
           </div>
           
@@ -1419,6 +1445,20 @@ function roleLabelRaw(r) {
       </div>`);
     
     window.nuGenPass = () => { document.getElementById('nuPass').value = genPassword(); };
+    window.previewPhoto = (input, previewId) => {
+      const file = input.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          document.getElementById(previewId).innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover">`;
+          input.dataset.base64 = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+    window.validatePhone = (el) => {
+      el.value = el.value.replace(/[^0-9]/g, '').slice(0, 9);
+    };
     window.checkUserMinor = (dateStr) => {
       if (!dateStr) return;
       const age = calcAge(dateStr);
@@ -1439,15 +1479,20 @@ function roleLabelRaw(r) {
     const pass     = document.getElementById('nuPass').value.trim();
     const role     = document.getElementById('nuRole').value;
     const teamId   = document.getElementById('nuTeam').value;
-    
+    const photo    = document.getElementById('nuPhotoInput').dataset.base64 || null;
+
     // Player extras
     const pNum     = document.getElementById('nuPlayerNum').value || 0;
     const pPos     = document.getElementById('nuPlayerPos').value;
 
     if (!name||!email||!pass||!birth||!phone) { showToast('Faltan campos obligatorios','error'); return; }
+    if (phone.length !== 9) { showToast('El teléfono debe tener 9 números','error'); return; }
     
     const age = calcAge(birth);
-    if (age < 18 && (!guardian || !pPhone)) { showToast('Nombre y teléfono del tutor son obligatorios','error'); return; }
+    if (age < 18) {
+      if (!guardian || !pPhone) { showToast('Datos del tutor son obligatorios','error'); return; }
+      if (pPhone.length !== 9) { showToast('El teléfono del tutor debe tener 9 números','error'); return; }
+    }
 
     if (!IS_DEMO_MODE) {
       try {
@@ -1457,7 +1502,7 @@ function roleLabelRaw(r) {
 
         // 1. Create User Account
         await db.collection('users').doc(uid).set({ 
-          name, birthDate:birth, phone, 
+          name, birthDate:birth, phone, photo,
           guardian: age < 18 ? guardian : null,
           parentPhone: age < 18 ? pPhone : null,
           email, role, teamId:teamId||null, active:true, 
@@ -1467,7 +1512,7 @@ function roleLabelRaw(r) {
         // 2. If it's a player and has team, create Player Profile automatically
         if (role === 'player' && teamId) {
           await db.collection('players').add({
-            uid, // Link to user account
+            uid, photo, // Pass photo to player doc too
             name, age, number:parseInt(pNum), position:pPos, teamId,
             guardian: age < 18 ? guardian : null,
             parentPhone: age < 18 ? pPhone : null,
@@ -1487,40 +1532,96 @@ function roleLabelRaw(r) {
   };
 
   window.editUser = async (userId) => {
-    const u = IS_DEMO_MODE ? null : await db.collection('users').doc(userId).get().then(d => ({id:d.id,...d.data()}));
-    if (!u && !IS_DEMO_MODE) { showToast('Usuario no encontrado','error'); return; }
+    const [u, teams] = await Promise.all([
+      db.collection('users').doc(userId).get().then(d => ({id:d.id,...d.data()})),
+      getTeams()
+    ]);
+    if (!u) { showToast('Usuario no encontrado','error'); return; }
     
     openModal(`
-      <div class="modal-sheet">
+      <div class="modal-sheet" style="max-height:90vh">
         <div class="modal-handle"></div>
         <div class="modal-title">Editar Usuario</div>
-        <div class="modal-body" style="padding-bottom:28px">
+        <div class="modal-body" style="padding-bottom:28px;overflow-y:auto">
+          
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding:12px;background:rgba(255,255,255,0.03);border-radius:16px;border:1px solid rgba(255,255,255,0.05)">
+            <div id="euPhotoPreview" style="width:64px;height:64px;border-radius:50%;background:var(--glass);display:flex;align-items:center;justify-content:center;font-size:24px;border:2px dashed rgba(255,255,255,0.2);overflow:hidden;flex-shrink:0">
+              ${u.photo ? `<img src="${u.photo}" style="width:100%;height:100%;object-fit:cover">` : '📸'}
+            </div>
+            <div style="flex:1">
+              <label class="form-label" style="margin-bottom:4px">CAMBIAR FOTO</label>
+              <input type="file" id="euPhotoInput" accept="image/*" style="font-size:12px;color:rgba(255,255,255,0.5)" onchange="previewPhoto(this, 'euPhotoPreview')">
+            </div>
+          </div>
+
           <div class="form-group" style="margin-bottom:12px">
             <label class="form-label">NOMBRE Y APELLIDOS</label>
-            <input class="form-input" id="euName" type="text" value="${u?.name||''}">
+            <input class="form-input" id="euName" type="text" value="${u.name||''}">
+          </div>
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label">TELÉFONO</label>
+            <input class="form-input" id="euPhone" type="tel" value="${u.phone||''}" maxlength="9" oninput="validatePhone(this)">
           </div>
           <div class="form-group" style="margin-bottom:12px">
             <label class="form-label">ROL</label>
             <select class="form-input" id="euRole">
-              <option value="player" ${u?.role==='player'?'selected':''}>Jugador/a</option>
-              <option value="coach" ${u?.role==='coach'?'selected':''}>Entrenador/a</option>
-              <option value="admin" ${u?.role==='admin'?'selected':''}>Administrador</option>
+              <option value="player" ${u.role==='player'?'selected':''}>Jugador/a</option>
+              <option value="coach" ${u.role==='coach'?'selected':''}>Entrenador/a</option>
+              <option value="admin" ${u.role==='admin'?'selected':''}>Administrador</option>
             </select>
           </div>
-          <button class="btn-full btn-primary-full" onclick="updateUser('${userId}')">Guardar cambios</button>
-          <button class="btn-full btn-ghost-full" style="margin-top:10px" onclick="_closeModal()">Cancelar</button>
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label">EQUIPO ASIGNADO</label>
+            <select class="form-input" id="euTeam">
+              <option value="">Sin equipo</option>
+              ${teams.map(t => `<option value="${t.id}" ${u.teamId===t.id?'selected':''}>${t.name}</option>`).join('')}
+            </select>
+          </div>
+          
+          <div style="margin:20px 0;padding:12px;background:rgba(255,255,255,0.03);border-radius:12px">
+            <div style="font-size:11px;font-weight:900;margin-bottom:10px;color:rgba(255,255,255,0.4)">ZONA DE PELIGRO</div>
+            <button class="btn-full btn-danger-full" style="background:#dc2626;color:white;border:none" onclick="deleteUser('${userId}')">Eliminar cuenta de usuario</button>
+            <div style="font-size:10px;color:rgba(255,255,255,0.3);margin-top:8px;text-align:center">Esta acción no se puede deshacer. El usuario perderá el acceso.</div>
+          </div>
+
+          <button class="btn-full btn-primary-full" onclick="updateUser('${userId}')" style="margin-bottom:10px">Guardar cambios</button>
+          <button class="btn-full btn-ghost-full" onclick="_closeModal()">Cancelar</button>
         </div>
       </div>`);
   };
 
   window.updateUser = async (userId) => {
-    const data = {
-      name: document.getElementById('euName').value.trim(),
-      role: document.getElementById('euRole').value
-    };
-    if (!IS_DEMO_MODE) await db.collection('users').doc(userId).update(data);
+    const photo = document.getElementById('euPhotoInput').dataset.base64;
+    const name  = document.getElementById('euName').value.trim();
+    const phone = document.getElementById('euPhone').value.trim();
+    const role  = document.getElementById('euRole').value;
+    const tId   = document.getElementById('euTeam').value || null;
+
+    if (phone.length !== 9) { showToast('El teléfono debe tener 9 números','error'); return; }
+
+    const data = { name, phone, role, teamId:tId };
+    if (photo) data.photo = photo;
+
+    if (!IS_DEMO_MODE) {
+      await db.collection('users').doc(userId).update(data);
+      // Sync photo and name to player profile if it exists
+      const psnap = await db.collection('players').where('uid','==',userId).get();
+      psnap.forEach(d => {
+        const updateObj = { name: data.name };
+        if (data.photo) updateObj.photo = data.photo;
+        d.ref.update(updateObj);
+      });
+    }
     _closeModal();
-    showToast('Usuario actualizado','success');
+    showToast('Usuario actualizado ✓','success');
+    renderAdminUsers(document.getElementById('appMain'));
+  };
+
+  window.deleteUser = async (userId) => {
+    if (!confirm('¿Estás COMPLETAMENTE SEGURO de querer eliminar este usuario? Perderá el acceso para siempre.')) return;
+    if (!IS_DEMO_MODE) await db.collection('users').doc(userId).delete();
+    _closeModal();
+    showToast('Usuario eliminado del sistema','success');
     renderAdminUsers(document.getElementById('appMain'));
   };
 
@@ -1548,7 +1649,7 @@ async function renderAdminTeams(container) {
           </div>
           <div style="display:flex;gap:8px">
             <button class="action-btn-circle" onclick="navigateTo('team-detail',{teamId:'${t.id}'})">👁</button>
-            <button class="action-btn-circle" style="color:var(--text-3)">✏️</button>
+            <button class="action-btn-circle" style="color:var(--text-3)" onclick="showEditTeamModal('${t.id}')">✏️</button>
           </div>
         </div>`).join('') : '<div class="empty-state">No hay equipos creados</div>'}
     </div>
@@ -1558,108 +1659,186 @@ async function renderAdminTeams(container) {
     <div style="height:16px"></div>`;
 }
 
-  window.showNewTeamModal = () => openModal(`
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div class="modal-title">Nuevo equipo</div>
-      <div class="modal-body" style="padding-bottom:28px">
-        <div class="form-group" style="margin-bottom:12px">
-          <label class="form-label" style="font-size:11px">NOMBRE DEL EQUIPO</label>
-          <input class="form-input" id="ntName" type="text" placeholder="Ej: Benjamín Masculino A">
+  window.showNewTeamModal = async () => {
+    const coaches = await db.collection('users').where('role','==','coach').get().then(s => s.docs.map(d=>({id:d.id,...d.data()})));
+    openModal(`
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div class="modal-title">Nuevo equipo</div>
+        <div class="modal-body" style="padding-bottom:28px">
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label" style="font-size:11px">NOMBRE DEL EQUIPO</label>
+            <input class="form-input" id="ntName" type="text" placeholder="Ej: Benjamín Masculino A">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+            <div class="form-group">
+              <label class="form-label">CATEGORÍA</label>
+              <select class="form-input" id="ntCat">
+                ${['Escuela','Benjamín','Alevín','Infantil','Cadete','Junior','Senior','Veteranos'].map(c=>`<option>${c}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">GÉNERO</label>
+              <select class="form-input" id="ntGender">
+                <option>Masculino</option><option>Femenino</option><option>Mixto</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:20px">
+            <label class="form-label">ENTRENADOR/A (BUSCANDO EN BD...)</label>
+            <select class="form-input" id="ntCoach">
+              <option value="">Seleccionar entrenador/a...</option>
+              ${coaches.map(c => `<option value="${c.name}">${c.name}</option>`).join('')}
+            </select>
+          </div>
+          <button class="btn-full btn-primary-full" onclick="createTeam()" style="margin-bottom:10px">Crear equipo</button>
+          <button class="btn-full btn-ghost-full" onclick="_closeModal()">Cancelar</button>
         </div>
-        <div class="form-group" style="margin-bottom:12px">
-          <label class="form-label" style="font-size:11px">CATEGORÍA</label>
-          <select class="form-input" id="ntCat" style="-webkit-appearance:none">
-            ${['Benjamín','Alevín','Infantil','Cadete','Junior','Senior','Veteranos'].map(c=>`<option>${c}</option>`).join('')}
-          </select>
+      </div>`);
+  };
+
+  window.showEditTeamModal = async (teamId) => {
+    const [team, coaches] = await Promise.all([
+      db.collection('teams').doc(teamId).get().then(d => ({id:d.id,...d.data()})),
+      db.collection('users').where('role','==','coach').get().then(s => s.docs.map(d=>({id:d.id,...d.data()})))
+    ]);
+    
+    openModal(`
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div class="modal-title">Editar equipo</div>
+        <div class="modal-body" style="padding-bottom:28px">
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label">NOMBRE DEL EQUIPO</label>
+            <input class="form-input" id="etName" type="text" value="${team.name}">
+          </div>
+          <div class="form-group" style="margin-bottom:20px">
+            <label class="form-label">ENTRENADOR/A</label>
+            <select class="form-input" id="etCoach">
+              <option value="">Sin entrenador/a asignado</option>
+              ${coaches.map(c => `<option value="${c.name}" ${team.coachName===c.name?'selected':''}>${c.name}</option>`).join('')}
+            </select>
+          </div>
+          <button class="btn-full btn-primary-full" onclick="updateTeam('${teamId}')" style="margin-bottom:10px">Guardar cambios</button>
+          <button class="btn-full btn-ghost-full" onclick="_closeModal()">Cancelar</button>
         </div>
-        <div class="form-group" style="margin-bottom:12px">
-          <label class="form-label" style="font-size:11px">GÉNERO</label>
-          <select class="form-input" id="ntGender" style="-webkit-appearance:none">
-            <option>Masculino</option><option>Femenino</option><option>Mixto</option>
-          </select>
-        </div>
-        <div class="form-group" style="margin-bottom:20px">
-          <label class="form-label" style="font-size:11px">ENTRENADOR/A RESPONSABLE</label>
-          <input class="form-input" id="ntCoach" type="text" placeholder="Nombre del entrenador/a">
-        </div>
-        <button class="btn-full btn-primary-full" onclick="createTeam()" style="margin-bottom:10px">Crear equipo</button>
-        <button class="btn-full btn-ghost-full" onclick="_closeModal()">Cancelar</button>
-      </div>
-    </div>`);
+      </div>`);
+  };
 
   window.createTeam = async () => {
     const name  = document.getElementById('ntName').value.trim();
     const cat   = document.getElementById('ntCat').value;
     const gender= document.getElementById('ntGender').value;
-    const coach = document.getElementById('ntCoach').value.trim();
+    const coach = document.getElementById('ntCoach').value;
     if (!name) { showToast('El nombre es obligatorio','error'); return; }
     if (!IS_DEMO_MODE) await db.collection('teams').add({ name, category:cat, gender, coachName:coach, playerCount:0, wins:0, losses:0, active:true, createdAt:firebase.firestore.FieldValue.serverTimestamp() });
     _closeModal();
     showToast(`Equipo "${name}" creado ✓`,'success');
+    renderAdminTeams(document.getElementById('appMain'));
   };
 
-  window.showAddPlayerModal = (teamId) => openModal(`
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div class="modal-title">Añadir jugador</div>
-      <div class="modal-body" style="padding-bottom:28px">
-        <div class="form-group" style="margin-bottom:12px">
-          <label class="form-label" style="font-size:11px">NOMBRE COMPLETO</label>
-          <input class="form-input" id="apName" type="text" placeholder="Nombre y apellidos">
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-          <div class="form-group">
-            <label class="form-label" style="font-size:11px">EDAD</label>
-            <input class="form-input" id="apAge" type="number" placeholder="12" oninput="checkMinor(this.value)">
-          </div>
-          <div class="form-group">
-            <label class="form-label" style="font-size:11px">DORSAL</label>
-            <input class="form-input" id="apNum" type="number" placeholder="4" min="0" max="99">
-          </div>
-        </div>
-        <div id="minorField" style="display:none;margin-bottom:12px">
-          <div class="form-group">
-            <label class="form-label" style="font-size:11px">REPRESENTANTE LEGAL (PADRE/MADRE)</label>
-            <input class="form-input" id="apGuardian" type="text" placeholder="Nombre del tutor">
-          </div>
-        </div>
-        <div class="form-group" style="margin-bottom:20px">
-          <label class="form-label" style="font-size:11px">POSICIÓN</label>
-          <select class="form-input" id="apPos" style="-webkit-appearance:none">
-            ${['Base','Escolta','Alero','Ala-Pívot','Pívot'].map(p=>`<option>${p}</option>`).join('')}
-          </select>
-        </div>
-        <button class="btn-full btn-primary-full" onclick="createPlayer('${teamId}')" style="margin-bottom:10px">Añadir jugador</button>
-        <button class="btn-full btn-ghost-full" onclick="_closeModal()">Cancelar</button>
-      </div>
-    </div>`);
-
-  window.checkMinor = (age) => {
-    document.getElementById('minorField').style.display = (age && parseInt(age) < 18) ? 'block' : 'none';
+  window.updateTeam = async (teamId) => {
+    const name  = document.getElementById('etName').value.trim();
+    const coach = document.getElementById('etCoach').value;
+    if (!name) return;
+    if (!IS_DEMO_MODE) await db.collection('teams').doc(teamId).update({ name, coachName:coach });
+    _closeModal();
+    showToast('Equipo actualizado ✓','success');
+    renderAdminTeams(document.getElementById('appMain'));
   };
 
-  window.createPlayer = async (teamId) => {
-    const name = document.getElementById('apName').value.trim();
-    const age  = parseInt(document.getElementById('apAge').value) || 0;
-    const num  = parseInt(document.getElementById('apNum').value) || 0;
-    const pos  = document.getElementById('apPos').value;
-    const guardian = document.getElementById('apGuardian').value.trim();
+  window.showAddPlayerModal = async (teamId) => {
+    // Fetch all users with role 'player'
+    const users = await db.collection('users').where('role','==','player').get().then(s => s.docs.map(d=>({id:d.id,...d.data()})));
     
-    if (!name || !age) { showToast('Nombre y edad son obligatorios','error'); return; }
-    if (age < 18 && !guardian) { showToast('El representante es obligatorio para menores','error'); return; }
+    openModal(`
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div class="modal-title">Asignar jugador al equipo</div>
+        <div class="modal-body" style="padding-bottom:28px">
+          
+          <div class="form-group" style="margin-bottom:16px">
+            <label class="form-label">SELECCIONAR USUARIO REGISTRADO</label>
+            <select class="form-input" id="apUserSelect" onchange="updateAddPlayerPreview(this.value)">
+              <option value="">Selecciona un jugador/a...</option>
+              ${users.map(u => `<option value="${u.id}" data-birth="${u.birthDate||''}" data-guardian="${u.guardian||''}" data-name="${u.name}">${u.name} (${u.email})</option>`).join('')}
+            </select>
+          </div>
+
+          <div id="apPreview" style="display:none;margin-bottom:16px;padding:12px;background:rgba(255,255,255,0.03);border-radius:12px;border:1px solid rgba(255,255,255,0.1)">
+             <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+               <span style="font-size:11px;color:rgba(255,255,255,0.5)">EDAD CALCULADA:</span>
+               <span id="apPreviewAge" style="font-size:11px;font-weight:900;color:var(--primary)">-- años</span>
+             </div>
+             <div id="apPreviewGuardianRow" style="display:flex;justify-content:space-between">
+               <span style="font-size:11px;color:rgba(255,255,255,0.5)">TUTOR/A:</span>
+               <span id="apPreviewGuardian" style="font-size:11px;font-weight:900">-</span>
+             </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+            <div class="form-group">
+              <label class="form-label">DORSAL</label>
+              <input class="form-input" id="apNum" type="number" placeholder="Ej: 23" min="0" max="99">
+            </div>
+            <div class="form-group">
+              <label class="form-label">POSICIÓN</label>
+              <select class="form-input" id="apPos">
+                <option>Base</option><option>Escolta</option><option>Alero</option><option>Ala-Pívot</option><option>Pívot</option>
+              </select>
+            </div>
+          </div>
+          
+          <button class="btn-full btn-primary-full" onclick="createPlayerFromUser('${teamId}')" style="margin-bottom:10px">Asignar a la plantilla</button>
+          <button class="btn-full btn-ghost-full" onclick="_closeModal()">Cancelar</button>
+        </div>
+      </div>`);
+
+    window.updateAddPlayerPreview = (userId) => {
+      const sel = document.getElementById('apUserSelect');
+      const opt = sel.options[sel.selectedIndex];
+      const preview = document.getElementById('apPreview');
+      if (!userId) { preview.style.display = 'none'; return; }
+      
+      const birth = opt.dataset.birth;
+      const guardian = opt.dataset.guardian;
+      const age = birth ? calcAge(birth) : '--';
+      
+      document.getElementById('apPreviewAge').textContent = `${age} años`;
+      document.getElementById('apPreviewGuardian').textContent = guardian || 'No requerido';
+      preview.style.display = 'block';
+    };
+  };
+
+  window.createPlayerFromUser = async (teamId) => {
+    const sel = document.getElementById('apUserSelect');
+    const opt = sel.options[sel.selectedIndex];
+    const uid = sel.value;
+    const name = opt.dataset.name;
+    const birth = opt.dataset.birth;
+    const guardian = opt.dataset.guardian;
+    const num = parseInt(document.getElementById('apNum').value) || 0;
+    const pos = document.getElementById('apPos').value;
+
+    if (!uid) { showToast('Selecciona un usuario','error'); return; }
+    
+    const age = birth ? calcAge(birth) : 0;
 
     if (!IS_DEMO_MODE) {
-      await db.collection('players').add({ 
-        name, age, number:num, position:pos, teamId, 
+      // Create player profile
+      await db.collection('players').add({
+        uid, name, age, number:num, position:pos, teamId,
         guardian: age < 18 ? guardian : null,
-        active:true, 
-        stats:{ pts:0, reb:0, ast:0, stl:0, blk:0, to:0, pf:0, reb_off:0, reb_def:0 }, 
-        createdAt:firebase.firestore.FieldValue.serverTimestamp() 
+        active:true,
+        stats:{ pts:0, reb:0, ast:0, stl:0, blk:0, to:0, pf:0, reb_off:0, reb_def:0 },
+        createdAt:firebase.firestore.FieldValue.serverTimestamp()
       });
+      // Also update user record to link back to team
+      await db.collection('users').doc(uid).update({ teamId });
     }
+    
     _closeModal();
-    showToast(`Jugador "${name}" añadido ✓`,'success');
+    showToast(`${name} añadido a la plantilla ✓`,'success');
     navigateTo('team-detail', { teamId });
   };
 
