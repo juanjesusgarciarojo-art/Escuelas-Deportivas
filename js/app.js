@@ -188,9 +188,19 @@ async function getTeams() {
 async function getPlayers(teamId) {
   if (IS_DEMO_MODE) return DEMO_DATA.players.filter(p => p.teamId === teamId);
   try {
-    const snap = await db.collection('players').where('teamId','==',teamId).where('active','==',true).orderBy('number').get();
-    return snap.docs.map(d => ({ id:d.id, ...d.data() }));
-  } catch(e) { return []; }
+    // Get all active players for this team
+    const snap = await db.collection('players')
+      .where('teamId','==',teamId)
+      .where('active','==',true)
+      .get();
+      
+    // Sort manually by number to avoid requiring composite indexes in Firestore
+    const list = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    return list.sort((a, b) => (a.number || 0) - (b.number || 0));
+  } catch(e) { 
+    console.error("Error cargando jugadores:", e);
+    return []; 
+  }
 }
 
 async function getGames(teamId = null) {
