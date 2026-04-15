@@ -1572,8 +1572,24 @@ function roleLabelRaw(r) {
             <input class="form-input" id="euName" type="text" value="${u.name||''}">
           </div>
           <div class="form-group" style="margin-bottom:12px">
-            <label class="form-label">TELÉFONO</label>
+            <label class="form-label">FECHA DE NACIMIENTO</label>
+            <input class="form-input" id="euBirth" type="date" value="${u.birth||''}" onchange="checkEditUserMinor(this.value)">
+          </div>
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label">TELÉFONO DE CONTACTO</label>
             <input class="form-input" id="euPhone" type="tel" value="${u.phone||''}" maxlength="9" oninput="validatePhone(this)">
+          </div>
+
+          <div id="euMinorField" style="display:${calcAge(u.birth)<18?'block':'none'};margin-bottom:16px;background:rgba(255,107,44,0.05);padding:14px;border-radius:12px;border:1px solid rgba(255,107,44,0.2)">
+            <div style="font-size:11px;font-weight:900;color:var(--primary);margin-bottom:10px;text-transform:uppercase">Datos del representante (Menor de edad)</div>
+            <div class="form-group" style="margin-bottom:12px">
+              <label class="form-label" style="font-size:10px">NOMBRE DEL PADRE/MADRE/TUTOR</label>
+              <input class="form-input" id="euGuardian" type="text" value="${u.guardian||''}">
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-size:10px">TELÉFONO DEL TUTOR</label>
+              <input class="form-input" id="euParentPhone" type="tel" value="${u.parentPhone||''}" maxlength="9" oninput="validatePhone(this)">
+            </div>
           </div>
           <div class="form-group" style="margin-bottom:12px">
             <label class="form-label">ROL</label>
@@ -1601,18 +1617,37 @@ function roleLabelRaw(r) {
           <button class="btn-full btn-ghost-full" onclick="_closeModal()">Cancelar</button>
         </div>
       </div>`);
+    window.checkEditUserMinor = (dateStr) => {
+      if (!dateStr) return;
+      const age = calcAge(dateStr);
+      const el = document.getElementById('euMinorField');
+      if (el) el.style.display = (age < 18) ? 'block' : 'none';
+    };
   };
 
   window.updateUser = async (userId) => {
     const photo = document.getElementById('euPhotoInput').dataset.base64;
-    const name  = document.getElementById('euName').value.trim();
-    const phone = document.getElementById('euPhone').value.trim();
-    const role  = document.getElementById('euRole').value;
-    const tId   = document.getElementById('euTeam').value || null;
+    const name     = document.getElementById('euName').value.trim();
+    const birth    = document.getElementById('euBirth').value;
+    const phone    = document.getElementById('euPhone').value.trim();
+    const role     = document.getElementById('euRole').value;
+    const teamId   = document.getElementById('euTeam').value || null;
+    const guardian = document.getElementById('euGuardian').value.trim();
+    const pPhone   = document.getElementById('euParentPhone').value.trim();
 
     if (phone.length !== 9) { showToast('El teléfono debe tener 9 números','error'); return; }
+    
+    const age = calcAge(birth);
+    if (age < 18) {
+      if (!guardian || !pPhone) { showToast('Datos del tutor obligatorios para menores','error'); return; }
+      if (pPhone.length !== 9) { showToast('El teléfono del tutor debe tener 9 números','error'); return; }
+    }
 
-    const data = { name, phone, role, teamId:tId };
+    const data = { 
+      name, birth, phone, role, teamId,
+      guardian: age < 18 ? guardian : null,
+      parentPhone: age < 18 ? pPhone : null
+    };
     if (photo) data.photo = photo;
 
     if (!IS_DEMO_MODE) {
@@ -1620,7 +1655,13 @@ function roleLabelRaw(r) {
       // Sync data to player profile if it exists (sports record)
       const psnap = await db.collection('players').where('uid','==',userId).get();
       psnap.forEach(d => {
-        const updateObj = { name: data.name, teamId: data.teamId };
+        const updateObj = { 
+          name: data.name, 
+          teamId: data.teamId,
+          birth: data.birth,
+          guardian: data.guardian,
+          parentPhone: data.parentPhone
+        };
         if (data.photo) updateObj.photo = data.photo;
         d.ref.update(updateObj);
       });
@@ -1631,10 +1672,16 @@ function roleLabelRaw(r) {
   };
 
   window.deleteUser = async (userId) => {
-    if (!confirm('¿Estás COMPLETAMENTE SEGURO de querer eliminar este usuario? Perderá el acceso para siempre.')) return;
-    if (!IS_DEMO_MODE) await db.collection('users').doc(userId).delete();
+    if (!confirm('¿Estás COMPLETAMENTE SEGURO de querer eliminar este usuario? Perderá el acceso y se borrará su ficha de jugador para siempre.')) return;
+    if (!IS_DEMO_MODE) {
+      // 1. Delete access account
+      await db.collection('users').doc(userId).delete();
+      // 2. Cascade delete player profile
+      const psnap = await db.collection('players').where('uid','==',userId).get();
+      psnap.forEach(d => d.ref.delete());
+    }
     _closeModal();
-    showToast('Usuario eliminado del sistema','success');
+    showToast('Usuario y ficha de jugador eliminados','success');
     renderAdminUsers(document.getElementById('appMain'));
   };
 
