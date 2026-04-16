@@ -140,6 +140,16 @@ function navigateTo(view, params = {}, addHistory = true) {
   if (nav) nav.classList.add('active');
 
   const main = document.getElementById('appMain');
+  const navEl = document.getElementById('bottomNav');
+  
+  if (view === 'game-live') {
+    navEl.style.display = 'none';
+    main.style.paddingBottom = '0';
+  } else {
+    navEl.style.display = 'flex';
+    main.style.paddingBottom = ''; // Falls back to CSS padding
+  }
+
   main.innerHTML = '';
   main.scrollTop = 0;
 
