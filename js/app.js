@@ -420,6 +420,9 @@ async function renderHome(container) {
       </div>
     </div>
 
+    <!-- Live Games Alert -->
+    ... (rest of codes) ...
+
     <!-- Hero Banner -->
     <div class="hero-banner">
       <div class="hero-title">Club Baloncesto<br>Gallardas 🏀</div>
@@ -680,6 +683,7 @@ async function renderPlayerDetail(container, { playerId, teamId }) {
     </div>
 
     <div style="padding:0 16px">
+      ${canSeeStats ? `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
         <div style="background:var(--bg-card);border:1px solid var(--glass-border);border-radius:20px;padding:16px;text-align:center">
            <div style="font-size:28px;font-weight:900;color:var(--primary)">${((p.stats?.pts||0)/(p.stats?.gp||1)).toFixed(1)}</div>
@@ -910,10 +914,76 @@ async function renderGameDetail(container, { gameId }) {
       </table>
     </div>` : ''}
 
-    <div style="height:16px"></div>`;
+    <!-- PRIVATE COACH REPORT -->
+    ${['admin','coach'].includes(APP.userData?.role) ? `
+    <div style="padding:0 16px 32px">
+      <div style="background:#0F172A;border:1px solid #1E293B;border-radius:24px;padding:20px;box-shadow:0 15px 40px rgba(0,0,0,0.5)">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+          <div style="width:32px;height:32px;background:rgba(255,255,255,0.1);border-radius:8px;display:flex;align-items:center;justify-content:center">👔</div>
+          <div style="font-size:14px;font-weight:900;color:white;letter-spacing:1px">INFORME TÉCNICO (PRIVADO)</div>
+        </div>
+        
+        <table style="width:100%;font-size:11px;color:rgba(255,255,255,0.7);border-collapse:collapse">
+          <thead>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.1)">
+              <th style="padding:8px 4px;text-align:left">JUGADOR</th>
+              <th style="padding:8px 4px;text-align:center">MINS</th>
+              <th style="padding:8px 4px;text-align:center">% FG</th>
+              <th style="padding:8px 4px;text-align:center">PÉRD.</th>
+              <th style="padding:8px 4px;text-align:center">FALT.</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${Object.keys(g.playerStats || {}).map(pid => {
+               const s = g.playerStats[pid];
+               const attempts = (s.pts_layup||0) + (s.pts_jump||0) + (s.miss_2||0) + (s.pts_3||0) + (s.miss_3||0);
+               const made = (s.pts_layup||0) + (s.pts_jump||0) + (s.pts_3||0);
+               const pct = attempts > 0 ? Math.round((made/attempts)*100) : 0;
+               const pName = team.players?.find(p => p.id === pid)?.name || 'Jugador';
+               return `
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.05)">
+                  <td style="padding:10px 4px;font-weight:700;color:white">${pName.split(' ')[0]}</td>
+                  <td style="padding:10px 4px;text-align:center">${Math.floor((s.mins||0)/60)}m</td>
+                  <td style="padding:10px 4px;text-align:center;color:${pct < 30 ? '#FF4444' : (pct > 50 ? '#4CAF50' : 'white')}">${pct}%</td>
+                  <td style="padding:10px 4px;text-align:center">${s.to||0}</td>
+                  <td style="padding:10px 4px;text-align:center">${s.pf||0}</td>
+                </tr>
+               `;
+            }).join('')}
+          </tbody>
+        </table>
+        <div style="margin-top:20px;padding:12px;background:rgba(255,255,255,0.03);border-radius:12px;font-size:10px;line-height:1.5;color:rgba(255,255,255,0.5)">
+           💡 <b>Consejo Técnico:</b> Los porcentajes de acierto en rojo indican una selección de tiro mejorable. Las pérdidas superiores a 3 por jugador sugieren necesidad de trabajar el bote bajo presión.
+        </div>
+      </div>
+    </div>` : ''}
+
+    <div style="padding:0 16px 40px">
+       <button class="btn-full btn-primary-full" onclick="navigateTo('team-detail',{teamId:'${g.teamId}'})">Volver a la plantilla</button>
+    </div>
+  `;
 }
 
 // ===================== VIEW: GAME LIVE =====================
+const STAT_BTNS = [
+  { stat:'pts_1',     label:'Tiro Libre', icon:'🎯' },
+  { stat:'miss_1',    label:'TL Fallado', icon:'❌' },
+  { stat:'pts_layup', label:'Entrada',    icon:'🏃' },
+  { stat:'pts_jump',  label:'Tiro Media', icon:'🏀' },
+  { stat:'miss_2',    label:'2p Fallado', icon:'✖️' },
+  { stat:'pts_3',     label:'Triple',      icon:'👌' },
+  { stat:'miss_3',    label:'3p Fallado', icon:'🔥' },
+  { stat:'reb_off',   label:'Reb. Off',   icon:'⏫' },
+  { stat:'reb_def',   label:'Reb. Def',   icon:'⏬' },
+  { stat:'ast',       label:'Asist.',     icon:'🤝' },
+  { stat:'stl',       label:'Robo',       icon:'🔒' },
+  { stat:'blk',       label:'Tapón',      icon:'🛡️' },
+  { stat:'to',        label:'Pérdida',    icon:'⚠️' },
+  { stat:'pf',        label:'F. Comit.',  icon:'🚫' },
+  { stat:'f_drawn',   label:'F. Recib.',  icon:'🩹' },
+  { stat:'mins',      label:'Sustit.',    icon:'🔄' },
+];
+
 function renderGameLive(container, { teamId, teamName, gameId }) {
   const players  = IS_DEMO_MODE ? DEMO_DATA.players.filter(p => p.teamId === (teamId||'t1')) : [];
   const liveStats = {};
@@ -930,9 +1000,35 @@ function renderGameLive(container, { teamId, teamName, gameId }) {
   let timerOn     = false;
   let timerInt    = null;
   let quarter     = 1;
+  const actionHistory = [];
+
+  window.undoLastAction = () => {
+    if (actionHistory.length === 0) { showToast('No hay nada que deshacer','info'); return; }
+    const last = actionHistory.pop();
+    const pid = last.pid;
+    const stat = last.stat;
+    
+    if (liveStats[pid]) {
+      if (stat === 'mins') {
+        liveStats[pid].onCourt = !liveStats[pid].onCourt;
+      } else {
+        liveStats[pid][stat] = Math.max(0, (liveStats[pid][stat]||0) - 1);
+        // If it was a shot from court, remove last shot from player's array
+        if (last.fromCourt && liveStats[pid].shots) {
+          liveStats[pid].shots.pop();
+        }
+      }
+      showToast('Acción deshecha','info');
+      refreshLiveUI();
+      syncLiveToFirebase();
+    }
+  };
 
   function homeScore() { return players.reduce((s,p) => s + getPlayerPts(p.id), 0); }
-  function getPlayerPts(pid) { const s = liveStats[pid]||{}; return (s.pts_1||0)*1+(s.pts_2||0)*2+(s.pts_3||0)*3; }
+  function getPlayerPts(pid) { 
+    const s = liveStats[pid]||{}; 
+    return (s.pts_1||0)*1 + (s.pts_layup||0)*2 + (s.pts_jump||0)*2 + (s.pts_3||0)*3; 
+  }
   function fmtTimer(s) { 
     let m = Math.floor(s/60);
     let sec = s%60;
@@ -954,9 +1050,13 @@ function renderGameLive(container, { teamId, teamName, gameId }) {
     db.collection('games').doc(gameId).update(update).catch(e => console.error(e));
   }
 
-  function addStat(pid, stat) {
+  function addStat(pid, stat, fromCourt = false) {
     if (!pid) return;
     if (!liveStats[pid]) liveStats[pid] = {};
+    
+    // Save to history
+    actionHistory.push({ pid, stat, fromCourt });
+    
     if (stat === 'mins') {
       liveStats[pid].onCourt = !liveStats[pid].onCourt;
       showToast(liveStats[pid].onCourt ? 'Entra a pista' : 'Sale al banquillo', 'info');
@@ -967,6 +1067,53 @@ function renderGameLive(container, { teamId, teamName, gameId }) {
     refreshLiveUI();
     syncLiveToFirebase();
   }
+
+  // Handle Court Click
+  // Handle Court Click
+  document.getElementById('shotCourt').onclick = (e) => {
+    if (!selPlayerId) { showToast('Selecciona un jugador primero','info'); return; }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    
+    // Determine zones
+    let type = '2p'; // Default
+    const dist = Math.sqrt(Math.pow(x-50,2) + Math.pow(y-10,2));
+    if (dist > 42 || x < 5 || x > 95) type = '3p';
+    else if (dist < 18) type = 'entrada';
+    
+    openShotModal(x, y, type);
+  };
+
+  const openShotModal = (x, y, type) => {
+    openModal(`
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div class="modal-title">${type.toUpperCase()} registrada</div>
+        <div class="modal-body" style="padding-bottom:32px;display:flex;gap:12px">
+           <button class="btn-full" style="background:#4CAF50;color:white" onclick="recordShot(true,'${type}',${x},${y})">✅ ANOTADA</button>
+           <button class="btn-full" style="background:#FF4444;color:white" onclick="recordShot(false,'${type}',${x},${y})">❌ FALLADA</button>
+        </div>
+      </div>`);
+  };
+
+  window.recordShot = (made, type, x, y) => {
+    const pid = selPlayerId;
+    if (!liveStats[pid].shots) liveStats[pid].shots = [];
+    liveStats[pid].shots.push({ x, y, made, type });
+    
+    // Add to stats
+    if (made) {
+      if (type === '3p') addStat(pid, 'pts_3', true);
+      else if (type === 'entrada') addStat(pid, 'pts_layup', true);
+      else addStat(pid, 'pts_jump', true);
+    } else {
+      if (type === '3p') addStat(pid, 'miss_3', true);
+      else addStat(pid, 'miss_2', true);
+    }
+    _closeModal();
+    showToast(`${made ? '¡Canasta!' : 'Fallo...'} registrada ✓`, made ? 'success' : 'info');
+  };
 
   function removeStat(pid, stat) {
     if (!pid || !liveStats[pid]) return;
@@ -996,31 +1143,26 @@ function renderGameLive(container, { teamId, teamName, gameId }) {
       if (b.stat === 'mins') {
          cnt.textContent = Math.floor(s.mins / 60) + "m";
       } else {
-        const v = s[b.stat]||0;
-        if (b.stat==='pts_1')      cnt.innerHTML = `${v} <span style="font-size:12px;color:var(--text-3)">(${v}pt)</span>`;
-        else if (b.stat==='pts_2') cnt.innerHTML = `${v} <span style="font-size:12px;color:var(--text-3)">(${v*2}pt)</span>`;
-        else if (b.stat==='pts_3') cnt.innerHTML = `${v} <span style="font-size:12px;color:var(--text-3)">(${v*3}pt)</span>`;
-        else cnt.textContent = v;
+         cnt.textContent = s[b.stat]||0;
       }
     });
   }
 
   const STAT_BTNS = [
-    { stat:'pts_1', icon:'🎯', label:'Libre (1pt)' },
-    { stat:'pts_2', icon:'🏀', label:'Campo (2pt)' },
-    { stat:'pts_3', icon:'⭐', label:'Triple (3pt)' },
-    { stat:'reb_off', icon:'💪', label:'Reb. Ofens.' },
-    { stat:'reb_def', icon:'🛡️', label:'Reb. Defens.' },
-    { stat:'ast', icon:'🤝', label:'Asistencia' },
-    { stat:'stl', icon:'🔒', label:'Robo' },
-    { stat:'blk', icon:'✋', label:'Tapón' },
-    { stat:'to',  icon:'❌', label:'Pérdida' },
-    { stat:'pf',  icon:'⚠️', label:'Falta pers.' },
-    { stat:'foul_rx',icon:'🆓',label:'Falta recib.' },
-    { stat:'mins',icon:'🔄', label:'Sustitución' },
+    { stat:'pts_1',   label:'T. Libre', icon:'🎯' },
+    { stat:'miss_1',  label:'X Libre',  icon:'❌' },
+    { stat:'reb_off', label:'Reb. Off', icon:'💪' },
+    { stat:'reb_def', label:'Reb. Def', icon:'🛡️' },
+    { stat:'ast',     label:'Asistencia', icon:'🤝' },
+    { stat:'stl',     label:'Robo',     icon:'🔒' },
+    { stat:'blk',     label:'Tapón',    icon:'✋' },
+    { stat:'to',      label:'Pérdida',  icon:'⚠️' },
+    { stat:'pf',      label:'Falta C.',  icon:'🚫' },
+    { stat:'f_drawn', label:'Falta R.',  icon:'🩹' },
+    { stat:'mins',    label:'Sustituir', icon:'🔄' },
   ];
 
-  const FEEDBACK_LABELS = { pts_1:'+1PT', pts_2:'+2PT', pts_3:'+3PT', reb_off:'REB.O', reb_def:'REB.D', ast:'AST', stl:'ROB', blk:'TAP', to:'PÉR', pf:'FALTA', foul_rx:'FALTA↗', mins:'SUST.' };
+  const FEEDBACK_LABELS = { pts_1:'+1PT', miss_1:'MISS', pts_layup:'+2PT', pts_jump:'+2PT', miss_2:'MISS', pts_3:'+3PT', miss_3:'MISS', reb_off:'REB.O', reb_def:'REB.D', ast:'AST', stl:'ROB', blk:'TAP', to:'PÉR', pf:'FALTA', f_drawn:'FALTA↗', mins:'SUST.' };
 
   function flashFeedback(stat) {
     const fb = document.getElementById('liveFeedback');
@@ -1037,7 +1179,10 @@ function renderGameLive(container, { teamId, teamName, gameId }) {
     <div style="background:var(--bg-dark);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--glass-border);position:sticky;top:0;z-index:20">
       <button style="background:none;border:none;color:var(--primary);font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font)" onclick="goBack()">← Salir</button>
       <div class="live-badge"><div class="live-dot"></div>&nbsp;EN VIVO</div>
-      <button id="endBtn" style="background:rgba(255,68,68,0.12);border:1px solid rgba(255,68,68,0.3);color:var(--danger);font-size:12px;font-weight:800;padding:6px 14px;border-radius:10px;cursor:pointer;font-family:var(--font)" onclick="endGameConfirm()">Finalizar</button>
+      <div style="display:flex;gap:8px">
+        <button onclick="undoLastAction()" style="background:rgba(59,130,246,0.12);border:1px solid rgba(59,130,246,0.3);color:#60A5FA;width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px" title="Deshacer">↩️</button>
+        <button id="endBtn" style="background:rgba(255,68,68,0.12);border:1px solid rgba(255,68,68,0.3);color:var(--danger);font-size:12px;font-weight:800;padding:6px 14px;border-radius:10px;cursor:pointer;font-family:var(--font)" onclick="endGameConfirm()">Finalizar</button>
+      </div>
     </div>
 
     <!-- Scoreboard -->
@@ -1069,20 +1214,30 @@ function renderGameLive(container, { teamId, teamName, gameId }) {
     <!-- Feedback Flash -->
     <div id="liveFeedback" style="position:fixed;top:200px;left:50%;transform:translateX(-50%) translateY(4px);background:var(--primary);color:white;font-size:20px;font-weight:900;padding:7px 20px;border-radius:12px;opacity:0;transition:all 0.25s;z-index:50;pointer-events:none;box-shadow:var(--shadow-primary)"></div>
 
-    <!-- Player selector -->
-    <div style="padding:12px 16px 4px">
-      <div style="font-size:10px;color:var(--text-3);font-weight:800;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Seleccionar jugador</div>
-      <div style="display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px" id="playerSelector">
-        ${players.length
-          ? players.map((p,i) => `
-            <button class="psBtn" data-pid="${p.id}"
-              onclick="selectPlayer('${p.id}',this)"
-              style="flex-shrink:0;padding:8px 12px;border-radius:10px;border:2px solid ${i===0?'var(--primary)':'var(--glass-border)'};background:${i===0?'rgba(255,107,44,0.12)':'var(--glass)'};color:${i===0?'var(--primary)':'var(--text-1)'};font-family:var(--font);font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;transition:all .2s">
-              <span class="psStatus" style="font-size:10px">⚪</span> #${p.number} ${p.name.split(' ')[0]}
-            </button>`).join('')
-          : `<div style="color:var(--text-3);font-size:14px">No hay jugadores en este equipo</div>`}
+    <!-- INTERACTIVE COURT -->
+    <div style="padding:0 16px 16px">
+      <div style="font-size:10px;color:var(--text-3);font-weight:800;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Ubicación del tiro (Mapa de Calor)</div>
+      <div id="shotCourt" style="width:100%;aspect-ratio:1.1;background:#1E293B;border-radius:16px;position:relative;border:2px solid var(--glass-border);overflow:hidden;cursor:crosshair">
+        <!-- SVG Court Lines -->
+        <svg viewBox="0 0 100 100" style="width:100%;height:100%;pointer-events:none">
+          <rect x="0" y="0" width="100" height="100" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+          <!-- Triple Line -->
+          <path d="M 5,0 L 5,10 A 45 45 0 0 0 95,10 L 95,0" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
+          <!-- Zone 0 (Restricted) -->
+          <rect x="35" y="0" width="30" height="40" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+          <circle cx="50" cy="40" r="15" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+          <!-- Hoop -->
+          <circle cx="50" cy="10" r="2.5" fill="none" stroke="var(--primary)" stroke-width="2"/>
+        </svg>
+        <div id="shotMarker" style="position:absolute;width:12px;height:12px;border-radius:50%;background:white;display:none;transform:translate(-50%,-50%);box-shadow:0 0 10px white"></div>
       </div>
-      <div style="font-size:11px;color:var(--text-3);margin-top:6px">Jugador activo: <span id="selPlayerLabel" style="color:var(--primary);font-weight:700">${players[0]?.name||'—'}</span></div>
+    </div>
+
+    <!-- Quick Stats for Active Player -->
+    <div style="padding:0 16px 20px">
+      <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;scrollbar-width:none" id="playerQuickStats">
+        <!-- Dyn. injected -->
+      </div>
     </div>
 
     <!-- Stat buttons -->
@@ -1170,52 +1325,185 @@ function renderGameLive(container, { teamId, teamName, gameId }) {
     
     const playersStatsUpdates = players.map(p => {
       const s = liveStats[p.id];
-      const pts = (s.pts_1*1) + (s.pts_2*2) + (s.pts_3*3);
-      const val = pts + s.reb_off + s.reb_def + s.ast + s.stl + s.blk - s.to;
+      const pts = (s.pts_1*1) + (s.pts_layup*2) + (s.pts_jump*2) + (s.pts_3*3);
+      const val = pts + s.reb_off + s.reb_def + s.ast + s.stl + s.blk + s.f_drawn - s.to 
+                  - (s.miss_1||0) - (s.miss_2||0) - (s.miss_3||0);
       if (val > maxVal) { maxVal = val; mvp = { id:p.id, name:p.name, val:val, pts:pts }; }
       
       return { id:p.id, stats: { ...s, pts, val } };
     });
 
+    // Practice handling
+    if (window._isPractice) {
+       showToast('Simulacro finalizado. Datos no guardados en el club.','info');
+       navigateTo('game-recap', { gameId: 'practice' }); 
+       // We'll store practice data in a global var temporarily for the recap
+       window._practiceData = { playerStats: playersStatsUpdates.reduce((acc,p)=>{acc[p.id]=p.stats; return acc;}, {}), mvp, homeScore: hs, awayScore: as_ };
+       return;
+    }
+
+    // 2. Official Save with Offline Protection
     if (!IS_DEMO_MODE && gameId) {
-      // 2. Update Game Record
-      await db.collection('games').doc(gameId).update({ 
-        homeScore: hs, awayScore: as_, status: 'finished', 
-        mvp: mvp, playerStats: liveStats,
-        lastUpdate: firebase.firestore.FieldValue.serverTimestamp()
-      });
+      try {
+        await db.collection('games').doc(gameId).update({ 
+          homeScore: hs, awayScore: as_, status: 'finished', 
+          mvp: mvp, playerStats: playersStatsUpdates.reduce((acc,p)=>{acc[p.id]=p.stats; return acc;}, {}),
+          lastUpdate: firebase.firestore.FieldValue.serverTimestamp()
+        });
 
-      // 3. Update Individual Player Stats (Cumulative)
-      for (const p of playersStatsUpdates) {
-        const pRef = db.collection('players').doc(p.id);
-        const pDoc = await pRef.get();
-        if (pDoc.exists) {
-          const old = pDoc.data().stats || {};
-          const news = p.stats;
-          // Sum up stats
-          const updated = {};
-          Object.keys(news).forEach(k => {
-            if (typeof news[k] === 'number') updated[k] = (old[k] || 0) + news[k];
-          });
-          updated.gp = (old.gp || 0) + 1; // Games Played
-          await pRef.update({ stats: updated });
+        // 3. Update Cumulative Stats
+        for (const p of playersStatsUpdates) {
+          const pRef = db.collection('players').doc(p.id);
+          const pDoc = await pRef.get();
+          if (pDoc.exists) {
+            const old = pDoc.data().stats || {};
+            const news = p.stats;
+            const updated = {};
+            Object.keys(news).forEach(k => {
+              if (typeof news[k] === 'number') updated[k] = (old[k] || 0) + news[k];
+            });
+            updated.gp = (old.gp || 0) + 1;
+            await pRef.update({ stats: updated });
+          }
         }
-      }
 
-      // 4. Update Team Record (Wins/Losses)
-      const tRef = db.collection('teams').doc(teamId);
-      const tDoc = await tRef.get();
-      if (tDoc.exists) {
-        const tData = tDoc.data();
-        const wins = (tData.wins || 0) + (hs > as_ ? 1 : 0);
-        const losses = (tData.losses || 0) + (hs < as_ ? 1 : 0);
-        await tRef.update({ wins, losses });
+        // 4. Update Team Record
+        const tRef = db.collection('teams').doc(g.teamId);
+        const tDoc = await tRef.get();
+        if (tDoc.exists) {
+          const tData = tDoc.data();
+          await tRef.update({ 
+            wins: (tData.wins || 0) + (hs > as_ ? 1 : 0), 
+            losses: (tData.losses || 0) + (hs < as_ ? 1 : 0) 
+          });
+        }
+        
+        showToast('🚀 ¡Partido registrado con éxito en el Club!', 'success');
+      } catch (err) {
+        console.error(err);
+        openModal(`
+          <div style="padding:24px;text-align:center">
+            <div style="font-size:40px;margin-bottom:15px">📡❌</div>
+            <div style="font-size:18px;font-weight:900;color:white;margin-bottom:10px">¡Error de Sincronización!</div>
+            <p style="font-size:13px;color:rgba(255,255,255,0.6);margin-bottom:20px">
+              Parece que no hay internet. No cierres la app o se perderán los datos.
+            </p>
+            <button class="btn-full btn-primary-full" onclick="saveFinishedGame(${hs},${as_})">
+              🔄 Reintentar Registro
+            </button>
+          </div>
+        `);
+        return;
       }
     }
 
-    showToast('¡Partido finalizado y estadísticas guardadas! ✓', 'success');
     navigateTo('game-recap', { gameId });
   };
+}
+
+// ===================== VIEW: GAME RECAP (POST-PARTIDO) =====================
+async function renderGameRecap(container, { gameId }) {
+  container.innerHTML = `<div class="loader"><div class="spinner"></div></div>`;
+  
+  let g, team, players;
+  if (gameId === 'practice') {
+    g = { ...window._practiceData, id: 'practice', teamId: (APP.userData.teamId || 't1') };
+    team = { name: 'Simulacro' };
+    players = await db.collection('players').where('teamId', '==', g.teamId).get().then(s => s.docs.map(d => ({id:d.id,...d.data()})));
+  } else {
+    g = await db.collection('games').doc(gameId).get().then(d => ({id:d.id,...d.data()}));
+    team = await db.collection('teams').doc(g.teamId).get().then(d => d.data());
+    players = await db.collection('players').where('teamId', '==', g.teamId).get().then(s => s.docs.map(d => ({id:d.id,...d.data()})));
+  }
+  
+  container.innerHTML = `
+    <div style="background:var(--bg-dark);padding:12px 16px;display:flex;align-items:center;border-bottom:1px solid var(--glass-border);position:sticky;top:0;z-index:20">
+      <button class="back-btn" style="margin:0" onclick="navigateTo('team-detail',{teamId:'${g.teamId}'})">‹ Salir</button>
+      <div style="margin-left:auto;font-size:12px;font-weight:800;color:var(--text-3)">INFORME FINAL</div>
+    </div>
+
+    <!-- Final Score Hero -->
+    <div style="background:linear-gradient(180deg, rgba(255,107,44,0.1) 0%, transparent 100%);padding:40px 16px;text-align:center">
+      <div style="font-size:12px;font-weight:900;color:var(--primary);letter-spacing:2px;margin-bottom:12px">RESULTADO FINAL</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:20px">
+        <div><div style="font-size:14px;font-weight:700;margin-bottom:4px;color:rgba(255,255,255,0.6)">${team.name}</div><div style="font-size:48px;font-weight:900;line-height:1">${g.homeScore}</div></div>
+        <div style="font-size:24px;opacity:0.2">vs</div>
+        <div><div style="font-size:14px;font-weight:700;margin-bottom:4px;color:rgba(255,255,255,0.6)">RIVAL</div><div style="font-size:48px;font-weight:900;line-height:1">${g.awayScore}</div></div>
+      </div>
+    </div>
+
+    <!-- MVP Section -->
+    ${g.mvp ? `
+    <div style="padding:0 16px 24px">
+      <div style="background:linear-gradient(135deg,rgba(255,184,0,0.1),rgba(255,184,0,0.02));border:1px solid rgba(255,184,0,0.2);border-radius:24px;padding:24px;text-align:center">
+        <div style="font-size:40px;margin-bottom:8px">👑</div>
+        <div style="font-size:18px;font-weight:900;color:#FFB800;margin-bottom:4px">${g.mvp.name}</div>
+        <div style="font-size:12px;color:rgba(255,184,0,0.8);font-weight:700">MVP DEL PARTIDO · VAL: ${g.mvp.val}</div>
+      </div>
+    </div>` : ''}
+
+    <!-- HEAT MAP SECTION -->
+    <div style="padding:0 16px 32px">
+      <div class="section-title" style="margin-bottom:16px;font-size:14px">MAPA DE TIRO DEL PARTIDO 🎯</div>
+      <div style="background:#1E293B;border-radius:24px;border:1px solid var(--glass-border);position:relative;aspect-ratio:1.1;overflow:hidden">
+        <svg viewBox="0 0 100 100" style="width:100%;height:100%">
+          <rect x="0" y="0" width="100" height="100" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+          <path d="M 5,0 L 5,10 A 45 45 0 0 0 95,10 L 95,0" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+          <circle cx="50" cy="10" r="2.5" fill="none" stroke="var(--primary)" stroke-width="1.5"/>
+          ${Object.keys(g.playerStats || {}).map(pid => {
+            const shots = g.playerStats[pid].shots || [];
+            return shots.map(s => `<circle cx="${s.x}" cy="${s.y}" r="1.8" fill="${s.made?'#4CAF50':'#FF4444'}" style="opacity:0.8"/>`).join('');
+          }).join('')}
+        </svg>
+      </div>
+    </div>
+
+    <!-- PRIVATE COACH REPORT -->
+    ${['admin','coach'].includes(APP.userData?.role) ? `
+    <div style="padding:16px">
+      <div style="background:#0F172A;border:1px solid #1E293B;border-radius:24px;padding:20px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+          <div style="width:36px;height:36px;background:rgba(255,255,255,0.1);border-radius:10px;display:flex;align-items:center;justify-content:center">👨‍🏫</div>
+          <div style="font-size:14px;font-weight:900;color:white">ANÁLISIS TÉCNICO (PRIVADO)</div>
+        </div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;font-size:11px;color:rgba(255,255,255,0.7);border-collapse:collapse;min-width:320px">
+            <thead>
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.1);text-align:left">
+                <th style="padding:8px 4px">JUGADOR</th>
+                <th style="padding:8px 4px">MINS</th>
+                <th style="padding:8px 4px">% FG</th>
+                <th style="padding:8px 4px">TO</th>
+                <th style="padding:8px 4px">FC/FR</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${Object.keys(g.playerStats || {}).map(pid => {
+                 const s = g.playerStats[pid];
+                 const shotsMade = (s.pts_layup||0) + (s.pts_jump||0) + (s.pts_3||0);
+                 const attempts = shotsMade + (s.miss_2||0) + (s.miss_3||0);
+                 const pct = attempts > 0 ? Math.round((shotsMade/attempts)*100) : 0;
+                 const p = players.find(x => x.id === pid) || {name:'?'};
+                 return `
+                  <tr style="border-bottom:1px solid rgba(255,255,255,0.05)">
+                    <td style="padding:12px 4px;font-weight:700;color:white">${p.name.split(' ')[0]}</td>
+                    <td style="padding:12px 4px">${Math.floor((s.mins||0)/60)}m</td>
+                    <td style="padding:12px 4px;font-weight:800;color:${pct>50?'#4CAF50':(pct<30?'#FF4444':'white')}">${pct}%</td>
+                    <td style="padding:12px 4px">${s.to||0}</td>
+                    <td style="padding:12px 4px">${s.pf||0}/${s.f_drawn||0}</td>
+                  </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>` : ''}
+
+    <div style="padding:20px 16px 40px">
+       <button class="btn-full btn-primary-full" onclick="navigateTo('team-detail',{teamId:'${g.teamId}'})">${gameId==='practice'?'Terminar simulacro':'Volver a plantilla'}</button>
+    </div>
+  `;
+}
 
 // ===================== VIEW: GAME LIVE (VIEW ONLY FOR PARENTS) =====================
 async function renderGameLiveViewOnly(container, { gameId, teamName }) {
@@ -1322,45 +1610,7 @@ async function renderGameLiveViewOnly(container, { gameId, teamName }) {
   APP.currentUnsubscribe = unsubscribe;
 }
 
-  // Long-press to subtract
-  let holdTimer = null;
-  window.startHold = (stat) => {
-    holdTimer = setTimeout(() => { removeStat(selPlayerId, stat); }, 600);
-  };
-  window.endHold = () => clearTimeout(holdTimer);
 
-  window.endGameConfirm = () => {
-    clearInterval(timerInt);
-    const hs = homeScore(), as_ = awayScore;
-    openModal(`
-      <div class="modal-sheet">
-        <div class="modal-handle"></div>
-        <div class="modal-title">Finalizar partido</div>
-        <div class="modal-body" style="padding-bottom:24px">
-          <div style="text-align:center;margin-bottom:20px">
-            <div style="font-size:52px;font-weight:900;color:var(--primary)">${hs} <span style="font-size:28px;color:var(--text-3)">-</span> ${as_}</div>
-            <div style="font-size:15px;color:var(--text-2);margin-top:6px">${hs>as_?'🏆 Victoria':'😔 Derrota'}</div>
-          </div>
-          <p style="font-size:14px;color:var(--text-2);text-align:center;margin-bottom:20px;line-height:1.5">
-            ¿Deseas guardar las estadísticas de este partido en la base de datos?
-          </p>
-          <button class="btn-full btn-primary-full" style="margin-bottom:10px" onclick="saveFinishedGame(${hs},${as_})">
-            💾 Guardar y finalizar
-          </button>
-          <button class="btn-full btn-ghost-full" onclick="_closeModal()">Seguir jugando</button>
-        </div>
-      </div>`);
-  };
-
-  window.saveFinishedGame = async (hs, as_) => {
-    if (!IS_DEMO_MODE && gameId) {
-      await db.collection('games').doc(gameId).update({ homeScore:hs, awayScore:as_, status:'finished' });
-    }
-    _closeModal();
-    showToast('Partido guardado correctamente','success');
-    setTimeout(() => goBack(), 600);
-  };
-}
 
 // ===================== VIEW: MESSAGES =====================
 async function renderMessages(container) {
@@ -1585,6 +1835,25 @@ async function renderAdmin(container) {
       <div>
         <div class="section-title">Panel de control</div>
         <div class="section-subtitle">Gestión del club</div>
+      </div>
+    </div>
+
+    <div class="stats-grid" style="margin-bottom:24px">
+      <div class="stat-card" onclick="navigateTo('admin-teams')">
+        <div class="stat-value">🛡️</div>
+        <div class="stat-label">Equipos</div>
+      </div>
+      <div class="stat-card" onclick="navigateTo('admin-players')">
+        <div class="stat-value">👥</div>
+        <div class="stat-label">Jugadores</div>
+      </div>
+      <div class="stat-card" onclick="startPractice()">
+        <div class="stat-value">📋</div>
+        <div class="stat-label">Simulacro</div>
+      </div>
+      <div class="stat-card" onclick="navigateTo('admin-news')">
+        <div class="stat-value">📢</div>
+        <div class="stat-label">Noticias</div>
       </div>
     </div>
 
@@ -2417,5 +2686,36 @@ async function renderAdminNews(container) {
     }
     showToast('¡Noticia publicada con éxito! ✓','success');
     goBack();
+  };
+}
+
+// ===================== VIEW: ADMIN PRACTICE (SIMULACRO) =====================
+async function renderAdminPractice(container) {
+  const teams = await getTeams();
+  container.innerHTML = `
+    <button class="back-btn" onclick="goBack()">‹ Volver</button>
+    <div class="section-header">
+      <div><div class="section-title">Modo Simulacro</div><div class="section-subtitle">Practica sin afectar a las estadísticas</div></div>
+    </div>
+    <div style="padding:0 16px 20px">
+       <div style="background:rgba(255,184,0,0.1);border:1px solid rgba(255,184,0,0.2);padding:14px;border-radius:12px;color:#FFB800;font-size:13px;line-height:1.5">
+         ⚠️ <b>¿Cómo funciona?</b> Selecciona un equipo y anota como si fuera un partido real. Al terminar, verás los informes tácticos pero <b>los puntos no se sumarán</b> a los perfiles de los jugadores.
+       </div>
+    </div>
+    <div style="padding:0 16px">
+      <div style="font-size:11px;font-weight:800;color:var(--text-3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">Elige un equipo para practicar</div>
+      <div class="card">
+        ${teams.map(t => `
+          <div class="list-item" onclick="startPractice('${t.id}','${t.name}')">
+            <div style="font-weight:700">🏀 ${t.name}</div>
+            <div style="font-size:12px;color:var(--text-3)">Pincha para empezar simulacro ›</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
+  window.startPractice = (teamId, teamName) => {
+    navigateTo('game-live', { teamId, teamName, gameId: 'practice', isPractice: true });
   };
 }
