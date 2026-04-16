@@ -995,8 +995,26 @@ const STAT_BTNS = [
   { stat:'mins',      label:'Sustit.',    icon:'🔄' },
 ];
 
-function renderGameLive(container, { teamId, teamName, gameId }) {
-  const players  = IS_DEMO_MODE ? DEMO_DATA.players.filter(p => p.teamId === (teamId||'t1')) : [];
+async function renderGameLive(container, { teamId, teamName, gameId, isPractice }) {
+  // Capture practice mode
+  window._isPractice = !!isPractice;
+  
+  // Show loader while fetching players
+  container.innerHTML = `<div class="loader"><div class="spinner"></div></div>`;
+  
+  // Fetch real players if not in demo mode
+  let players = [];
+  if (IS_DEMO_MODE) {
+    players = DEMO_DATA.players.filter(p => p.teamId === (teamId||'t1'));
+  } else {
+    try {
+      players = await getPlayers(teamId);
+    } catch(e) {
+      console.error("Error fetching players:", e);
+      showToast("Error al cargar jugadores", "error");
+    }
+  }
+
   const liveStats = {};
   players.forEach(p => { 
     liveStats[p.id] = { 
@@ -1079,21 +1097,25 @@ function renderGameLive(container, { teamId, teamName, gameId }) {
     syncLiveToFirebase();
   }
 
-  // Handle Court Click
-  // Handle Court Click
-  document.getElementById('shotCourt').onclick = (e) => {
-    if (!selPlayerId) { showToast('Selecciona un jugador primero','info'); return; }
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    
-    // Determine zones
-    let type = '2p'; // Default
-    const dist = Math.sqrt(Math.pow(x-50,2) + Math.pow(y-10,2));
-    if (dist > 42 || x < 5 || x > 95) type = '3p';
-    else if (dist < 18) type = 'entrada';
-    
-    openShotModal(x, y, type);
+  // Handle Court Click (Moved inside setup but will be attached after innerHTML)
+  const setupEventListeners = () => {
+    const shotCourt = document.getElementById('shotCourt');
+    if (shotCourt) {
+      shotCourt.onclick = (e) => {
+        if (!selPlayerId) { showToast('Selecciona un jugador primero','info'); return; }
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = ((e.clientX - rect.left) / rect.width) * 100;
+        const y = ((e.clientY - rect.top) / rect.height) * 100;
+        
+        // Determine zones
+        let type = '2p'; // Default
+        const dist = Math.sqrt(Math.pow(x-50,2) + Math.pow(y-10,2));
+        if (dist > 42 || x < 5 || x > 95) type = '3p';
+        else if (dist < 18) type = 'entrada';
+        
+        openShotModal(x, y, type);
+      };
+    }
   };
 
   const openShotModal = (x, y, type) => {
@@ -1229,47 +1251,55 @@ function renderGameLive(container, { teamId, teamName, gameId }) {
     <div style="padding:0 16px 16px">
       <div style="font-size:10px;color:var(--text-3);font-weight:800;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Ubicación del tiro (Mapa de Calor)</div>
       <div id="shotCourt" style="width:100%;aspect-ratio:1.1;background:#1E293B;border-radius:16px;position:relative;border:2px solid var(--glass-border);overflow:hidden;cursor:crosshair">
-        <!-- SVG Court Lines -->
         <svg viewBox="0 0 100 100" style="width:100%;height:100%;pointer-events:none">
           <rect x="0" y="0" width="100" height="100" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
-          <!-- Triple Line -->
           <path d="M 5,0 L 5,10 A 45 45 0 0 0 95,10 L 95,0" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
-          <!-- Zone 0 (Restricted) -->
           <rect x="35" y="0" width="30" height="40" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
           <circle cx="50" cy="40" r="15" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
-          <!-- Hoop -->
           <circle cx="50" cy="10" r="2.5" fill="none" stroke="var(--primary)" stroke-width="2"/>
         </svg>
         <div id="shotMarker" style="position:absolute;width:12px;height:12px;border-radius:50%;background:white;display:none;transform:translate(-50%,-50%);box-shadow:0 0 10px white"></div>
       </div>
     </div>
 
-    <!-- Quick Stats for Active Player -->
+    <!-- Player Selection (FIXED INJECTION) -->
     <div style="padding:0 16px 20px">
+      <div style="font-size:10px;color:var(--text-3);font-weight:800;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Seleccionar Jugadora</div>
       <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;scrollbar-width:none" id="playerQuickStats">
-        <!-- Dyn. injected -->
+        ${players.map(p => `
+          <div class="psBtn ${p.id === selPlayerId ? 'active' : ''}" data-pid="${p.id}" onclick="selectPlayer('${p.id}', this)">
+            <div class="psNum">${p.number || '00'}</div>
+            <div class="psName">${p.name.split(' ')[0]}</div>
+            <div class="psStatus">⚪</div>
+          </div>
+        `).join('')}
       </div>
     </div>
 
     <!-- Stat buttons -->
-    <div style="padding:8px 16px 0">
-      <div style="font-size:10px;color:var(--text-3);font-weight:800;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Registrar acción · Mantén pulsado para restar</div>
-    </div>
+    <div style="background:var(--bg-card);border-radius:28px 28px 0 0;padding-top:16px;margin-top:0">
+      <div style="padding:0 16px 12px;text-align:center">
+         <span id="selPlayerLabel" style="font-size:16px;font-weight:900;color:var(--primary)">${players.find(p=>p.id===selPlayerId)?.name || 'Selecciona Jugadora'}</span>
+      </div>
+      <div class="stat-btn-grid">
+        ${STAT_BTNS.map(b => `
+          <div class="stat-btn" data-stat="${b.stat}"
+            ontouchstart="startHold('${b.stat}')" ontouchend="endHold()"
+            ontouchcancel="endHold()"
+            onclick="addStat(selPlayerId,'${b.stat}')">
+            <div class="stat-btn-icon">${b.icon}</div>
+            <div class="stat-btn-count" id="cnt_${b.stat}">0</div>
+            <div class="stat-btn-label">${b.label}</div>
+          </div>`).join('')}
+      </div>
+      <p style="text-align:center;font-size:11px;color:var(--text-3);padding:4px 16px 24px">
+        Toca para +1 · Mantén 1 segundo para −1
+      </p>
+    </div>`;
 
-    <div class="stat-btn-grid">
-      ${STAT_BTNS.map(b => `
-        <div class="stat-btn" data-stat="${b.stat}"
-          ontouchstart="startHold('${b.stat}')" ontouchend="endHold()"
-          ontouchcancel="endHold()"
-          onclick="addStat(selPlayerId,'${b.stat}')">
-          <div class="stat-btn-icon">${b.icon}</div>
-          <div class="stat-btn-count" id="cnt_${b.stat}">0</div>
-          <div class="stat-btn-label">${b.label}</div>
-        </div>`).join('')}
-    </div>
-    <p style="text-align:center;font-size:11px;color:var(--text-3);padding:4px 16px 24px">
-      Toca para +1 · Mantén 1 segundo para −1
-    </p>`;
+  // Attach event listeners and initial UI state
+  setupEventListeners();
+  refreshLiveUI();
 
   // expose to global scope
   window.selPlayerId = selPlayerId;
@@ -1379,7 +1409,7 @@ function renderGameLive(container, { teamId, teamName, gameId }) {
         }
 
         // 4. Update Team Record
-        const tRef = db.collection('teams').doc(g.teamId);
+        const tRef = db.collection('teams').doc(teamId);
         const tDoc = await tRef.get();
         if (tDoc.exists) {
           const tData = tDoc.data();
@@ -1399,9 +1429,8 @@ function renderGameLive(container, { teamId, teamName, gameId }) {
             <p style="font-size:13px;color:rgba(255,255,255,0.6);margin-bottom:20px">
               Parece que no hay internet. No cierres la app o se perderán los datos.
             </p>
-            <button class="btn-full btn-primary-full" onclick="saveFinishedGame(${hs},${as_})">
-              🔄 Reintentar Registro
-            </button>
+            <button class="btn-full btn-primary-full" onclick="endGameConfirm()">🔄 Reintentar Registro</button>
+
           </div>
         `);
         return;

@@ -895,3 +895,32 @@ select.form-input option {
 .px-16 { padding-left: 16px; padding-right: 16px; }
 .pb-16 { padding-bottom: 16px; }
 .flex-center { display: flex; align-items: center; justify-content: center; }
+/* Player Selection in Live Game */
+.psBtn {
+  flex-shrink: 0;
+  width: 100px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+}
+.psBtn:active { transform: scale(0.95); background: rgba(255,107,44,0.1); }
+.psBtn.active {
+  border-color: var(--primary);
+  background: rgba(255,107,44,0.12);
+  box-shadow: 0 0 15px rgba(255,107,44,0.2);
+}
+
+.psNum { font-size: 24px; font-weight: 900; color: var(--primary); line-height: 1; }
+.psName { font-size: 11px; font-weight: 700; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.psStatus { font-size: 10px; margin-top: 2px; }
+
+#playerQuickStats::-webkit-scrollbar { display: none; }
