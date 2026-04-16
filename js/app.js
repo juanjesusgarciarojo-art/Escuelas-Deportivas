@@ -70,7 +70,7 @@ const VIEW_TO_NAV = {
   messages:'messages', 'message-detail':'messages',
   profile:'profile', admin:'admin', 'admin-users':'admin',
   'admin-teams':'admin', 'admin-players':'admin', 'admin-compose':'admin',
-  'admin-permissions':'admin', 'admin-news':'admin',
+  'admin-permissions':'admin', 'admin-news':'admin', 'admin-practice':'admin',
 };
 
 // ===================== INIT =====================
@@ -160,6 +160,7 @@ function navigateTo(view, params = {}, addHistory = true) {
     'admin-compose':      renderAdminCompose,
     'admin-permissions':  renderAdminPermissions,
     'admin-news':         renderAdminNews,
+    'admin-practice':     renderAdminPractice,
     'game-live-view':     renderGameLiveViewOnly,
     'game-recap':         renderGameRecap
   };
@@ -1847,7 +1848,7 @@ async function renderAdmin(container) {
         <div class="stat-value">👥</div>
         <div class="stat-label">Jugadores</div>
       </div>
-      <div class="stat-card" onclick="startPractice()">
+      <div class="stat-card" onclick="navigateTo('admin-practice')">
         <div class="stat-value">📋</div>
         <div class="stat-label">Simulacro</div>
       </div>
