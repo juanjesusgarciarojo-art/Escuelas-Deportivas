@@ -66,7 +66,7 @@ const APP = {
 
 const VIEW_TO_NAV = {
   home:'home', teams:'teams', 'team-detail':'teams', 'player-detail':'teams',
-  games:'games', 'game-detail':'games', 'game-live':'games',
+  games:'games', 'game-detail':'games', 'game-live':'games', 'game-live-view':'games', 'game-recap':'games',
   messages:'messages', 'message-detail':'messages',
   profile:'profile', admin:'admin', 'admin-users':'admin',
   'admin-teams':'admin', 'admin-players':'admin', 'admin-compose':'admin',
@@ -160,6 +160,8 @@ function navigateTo(view, params = {}, addHistory = true) {
     'admin-compose':      renderAdminCompose,
     'admin-permissions':  renderAdminPermissions,
     'admin-news':         renderAdminNews,
+    'game-live-view':     renderGameLiveViewOnly,
+    'game-recap':         renderGameRecap
   };
   (views[view] || renderHome)(main, params);
 }
@@ -449,6 +451,29 @@ async function renderHome(container) {
     </div>
     <div class="empty-state">No hay noticias publicadas recientemente</div>`}
 
+    <!-- Live Games Alert -->
+    ${games.filter(g => g.status === 'live').map(lg => `
+    <div class="live-game-banner" onclick="navigateTo('game-live-view', { gameId:'${lg.id}', teamName:'${lg.teamName||'Gallardas'}' })">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="live-badge"><div class="live-dot"></div>&nbsp;PARTIDO EN DIRECTO</div>
+        <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.6)">${lg.quarter === 'PR' ? 'PRORROGA' : 'CUARTO ' + lg.quarter}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px">
+        <div style="text-align:right">
+          <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-bottom:2px">${lg.teamName||'Gallardas'}</div>
+          <div style="font-size:28px;font-weight:900;line-height:1">${lg.homeScore||0}</div>
+        </div>
+        <div style="font-size:18px;opacity:0.3">VS</div>
+        <div style="text-align:left">
+          <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-bottom:2px">Rival</div>
+          <div style="font-size:28px;font-weight:900;line-height:1">${lg.awayScore||0}</div>
+        </div>
+      </div>
+      <div style="margin-top:12px;display:flex;justify-content:center">
+        <button class="btn-live-join">Ver marcador en vivo ›</button>
+      </div>
+    </div>`).join('')}
+
     <!-- Competición -->
     ${upcoming.length ? `
     <div class="section-header" style="margin-top:24px">
@@ -649,10 +674,48 @@ async function renderPlayerDetail(container, { playerId, teamId }) {
       </div>
     </div>
 
-    ${canSeeStats ? `
     <div class="section-header" style="padding-top:16px">
-      <div class="section-title" style="font-size:17px">Media por partido</div>
-      <div class="chip">Temporada 24/25</div>
+      <div class="section-title" style="font-size:17px">Promedio de Temporada</div>
+      <div class="chip" style="background:rgba(255,255,255,0.05);padding:4px 10px;border-radius:20px;font-size:10px;font-weight:900">${p.stats?.gp||0} PARTIDOS</div>
+    </div>
+
+    <div style="padding:0 16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div style="background:var(--bg-card);border:1px solid var(--glass-border);border-radius:20px;padding:16px;text-align:center">
+           <div style="font-size:28px;font-weight:900;color:var(--primary)">${((p.stats?.pts||0)/(p.stats?.gp||1)).toFixed(1)}</div>
+           <div style="font-size:10px;font-weight:700;color:var(--text-3);letter-spacing:1px">PUNTOS / PARTIDO</div>
+        </div>
+        <div style="background:var(--bg-card);border:1px solid var(--glass-border);border-radius:20px;padding:16px;text-align:center">
+           <div style="font-size:28px;font-weight:900;color:var(--secondary)">${((p.stats?.val||0)/(p.stats?.gp||1)).toFixed(1)}</div>
+           <div style="font-size:10px;font-weight:700;color:var(--text-3);letter-spacing:1px">VALORACIÓN MEDIA</div>
+        </div>
+      </div>
+      
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px">
+        <div style="background:var(--glass);padding:12px;border-radius:12px;text-align:center">
+           <div style="font-weight:800">${((p.stats?.reb||0)/(p.stats?.gp||1)).toFixed(1)}</div><div style="font-size:9px;opacity:0.6">REB</div>
+        </div>
+        <div style="background:var(--glass);padding:12px;border-radius:12px;text-align:center">
+           <div style="font-weight:800">${((p.stats?.ast||0)/(p.stats?.gp||1)).toFixed(1)}</div><div style="font-size:9px;opacity:0.6">AST</div>
+        </div>
+        <div style="background:var(--glass);padding:12px;border-radius:12px;text-align:center">
+           <div style="font-weight:800">${Math.round((p.stats?.mins||0)/(p.stats?.gp||1)/60)}m</div><div style="font-size:9px;opacity:0.6">MIN</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Specialty Badges -->
+    <div style="padding:0 16px 20px">
+       <div class="card" style="padding:16px">
+          <div style="font-size:12px;font-weight:800;color:var(--text-2);margin-bottom:12px">ESPECIALIDADES DEL JUGADOR</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+             ${(p.stats?.pts/p.stats?.gp) > 12 ? '<span class="tag" style="background:rgba(255,107,44,0.1);color:var(--primary)">🔥 ANOTADOR</span>' : ''}
+             ${(p.stats?.reb/p.stats?.gp) > 6 ? '<span class="tag" style="background:rgba(59,130,246,0.1);color:#60A5FA">🛡️ BALUARTE</span>' : ''}
+             ${(p.stats?.ast/p.stats?.gp) > 4 ? '<span class="tag" style="background:rgba(16,185,129,0.1);color:#10B981">🎯 DIRECTOR</span>' : ''}
+             ${(p.stats?.gp) > 0 ? `<span class="tag" style="background:rgba(255,184,0,0.1);color:#FFB800">✨ MVPs: ${p.stats?.mvpCount||0}</span>` : ''}
+             <span class="tag" style="background:rgba(255,255,255,0.05);color:var(--text-2)">💪 COMPROMISO</span>
+          </div>
+       </div>
     </div>
 
     <div class="h-scroll">
@@ -854,7 +917,12 @@ async function renderGameDetail(container, { gameId }) {
 function renderGameLive(container, { teamId, teamName, gameId }) {
   const players  = IS_DEMO_MODE ? DEMO_DATA.players.filter(p => p.teamId === (teamId||'t1')) : [];
   const liveStats = {};
-  players.forEach(p => { liveStats[p.id] = { pts_1:0, pts_2:0, pts_3:0, reb_off:0, reb_def:0, ast:0, stl:0, blk:0, to:0, pf:0 }; });
+  players.forEach(p => { 
+    liveStats[p.id] = { 
+      pts_1:0, pts_2:0, pts_3:0, reb_off:0, reb_def:0, ast:0, stl:0, blk:0, to:0, pf:0,
+      mins: 0, onCourt: false 
+    }; 
+  });
 
   let selPlayerId = players[0]?.id || null;
   let awayScore   = 0;
@@ -865,14 +933,39 @@ function renderGameLive(container, { teamId, teamName, gameId }) {
 
   function homeScore() { return players.reduce((s,p) => s + getPlayerPts(p.id), 0); }
   function getPlayerPts(pid) { const s = liveStats[pid]||{}; return (s.pts_1||0)*1+(s.pts_2||0)*2+(s.pts_3||0)*3; }
-  function fmtTimer(s) { return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; }
+  function fmtTimer(s) { 
+    let m = Math.floor(s/60);
+    let sec = s%60;
+    return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`; 
+  }
+
+  // Update Firestore for Live tracking (Parents view this)
+  async function syncLiveToFirebase() {
+    if (IS_DEMO_MODE || !gameId) return;
+    const update = {
+      homeScore: homeScore(),
+      awayScore: awayScore,
+      timer: timerSec,
+      quarter: quarter,
+      status: 'live',
+      lastUpdate: firebase.firestore.FieldValue.serverTimestamp(),
+      liveFouls: players.map(p => ({ pid:p.id, name:p.name, pf:liveStats[p.id].pf, on:liveStats[p.id].onCourt }))
+    };
+    db.collection('games').doc(gameId).update(update).catch(e => console.error(e));
+  }
 
   function addStat(pid, stat) {
     if (!pid) return;
     if (!liveStats[pid]) liveStats[pid] = {};
-    liveStats[pid][stat] = (liveStats[pid][stat]||0) + 1;
+    if (stat === 'mins') {
+      liveStats[pid].onCourt = !liveStats[pid].onCourt;
+      showToast(liveStats[pid].onCourt ? 'Entra a pista' : 'Sale al banquillo', 'info');
+    } else {
+      liveStats[pid][stat] = (liveStats[pid][stat]||0) + 1;
+      flashFeedback(stat);
+    }
     refreshLiveUI();
-    flashFeedback(stat);
+    syncLiveToFirebase();
   }
 
   function removeStat(pid, stat) {
@@ -884,17 +977,31 @@ function renderGameLive(container, { teamId, teamName, gameId }) {
   function refreshLiveUI() {
     const hEl = document.getElementById('lvHomeScore');
     if (hEl) hEl.textContent = homeScore();
+    
+    // Update player on-court indicators
+    players.forEach(p => {
+      const btn = document.querySelector(`.psBtn[data-pid="${p.id}"]`);
+      if (btn) {
+        const dot = liveStats[p.id].onCourt ? '🟢' : '⚪';
+        const fouls = liveStats[p.id].pf >= 4 ? ' ⚠️' : '';
+        btn.querySelector('.psStatus').textContent = dot + fouls;
+      }
+    });
 
     if (!selPlayerId) return;
     const s = liveStats[selPlayerId] || {};
     STAT_BTNS.forEach(b => {
       const cnt = document.getElementById('cnt_'+b.stat);
       if (!cnt) return;
-      const v = s[b.stat]||0;
-      if (b.stat==='pts_1')      cnt.innerHTML = `${v} <span style="font-size:12px;color:var(--text-3)">(${v}pt)</span>`;
-      else if (b.stat==='pts_2') cnt.innerHTML = `${v} <span style="font-size:12px;color:var(--text-3)">(${v*2}pt)</span>`;
-      else if (b.stat==='pts_3') cnt.innerHTML = `${v} <span style="font-size:12px;color:var(--text-3)">(${v*3}pt)</span>`;
-      else cnt.textContent = v;
+      if (b.stat === 'mins') {
+         cnt.textContent = Math.floor(s.mins / 60) + "m";
+      } else {
+        const v = s[b.stat]||0;
+        if (b.stat==='pts_1')      cnt.innerHTML = `${v} <span style="font-size:12px;color:var(--text-3)">(${v}pt)</span>`;
+        else if (b.stat==='pts_2') cnt.innerHTML = `${v} <span style="font-size:12px;color:var(--text-3)">(${v*2}pt)</span>`;
+        else if (b.stat==='pts_3') cnt.innerHTML = `${v} <span style="font-size:12px;color:var(--text-3)">(${v*3}pt)</span>`;
+        else cnt.textContent = v;
+      }
     });
   }
 
@@ -971,7 +1078,7 @@ function renderGameLive(container, { teamId, teamName, gameId }) {
             <button class="psBtn" data-pid="${p.id}"
               onclick="selectPlayer('${p.id}',this)"
               style="flex-shrink:0;padding:8px 12px;border-radius:10px;border:2px solid ${i===0?'var(--primary)':'var(--glass-border)'};background:${i===0?'rgba(255,107,44,0.12)':'var(--glass)'};color:${i===0?'var(--primary)':'var(--text-1)'};font-family:var(--font);font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;transition:all .2s">
-              #${p.number} ${p.name.split(' ')[0]}
+              <span class="psStatus" style="font-size:10px">⚪</span> #${p.number} ${p.name.split(' ')[0]}
             </button>`).join('')
           : `<div style="color:var(--text-3);font-size:14px">No hay jugadores en este equipo</div>`}
       </div>
@@ -1031,19 +1138,189 @@ function renderGameLive(container, { teamId, teamName, gameId }) {
       if (btn) btn.textContent = '⏸ Pausar';
       timerInt = setInterval(() => {
         timerSec++;
+        // Track individual minutes for players on court
+        players.forEach(p => { 
+          if (liveStats[p.id].onCourt) liveStats[p.id].mins++; 
+        });
+        
         const el = document.getElementById('lvTimer');
         if (el) el.textContent = fmtTimer(timerSec);
+        
+        // Sync to firebase every 10 seconds for parents
+        if (timerSec % 10 === 0) syncLiveToFirebase();
       }, 1000);
     } else {
       if (btn) btn.textContent = '▶ Reanudar';
       clearInterval(timerInt);
+      syncLiveToFirebase(); // Final sync on pause
     }
   };
 
-  window.nextQuarter = () => {
-    if (quarter < 4) { quarter++; document.getElementById('lvQuarter').textContent = `Q${quarter}`; }
-    else { document.getElementById('lvQuarter').textContent = 'PR'; }
+  window.endGameConfirm = async () => {
+    clearInterval(timerInt);
+    const hs = homeScore();
+    const as_ = awayScore;
+    if (!confirm(`¿Finalizar partido? Resultado: ${hs} - ${as_}`)) return;
+    
+    showToast('Calculando estadísticas y MVP...', 'info');
+    
+    // 1. Calculate MVP (by Efficiency/Valoración)
+    let mvp = null;
+    let maxVal = -999;
+    
+    const playersStatsUpdates = players.map(p => {
+      const s = liveStats[p.id];
+      const pts = (s.pts_1*1) + (s.pts_2*2) + (s.pts_3*3);
+      const val = pts + s.reb_off + s.reb_def + s.ast + s.stl + s.blk - s.to;
+      if (val > maxVal) { maxVal = val; mvp = { id:p.id, name:p.name, val:val, pts:pts }; }
+      
+      return { id:p.id, stats: { ...s, pts, val } };
+    });
+
+    if (!IS_DEMO_MODE && gameId) {
+      // 2. Update Game Record
+      await db.collection('games').doc(gameId).update({ 
+        homeScore: hs, awayScore: as_, status: 'finished', 
+        mvp: mvp, playerStats: liveStats,
+        lastUpdate: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      // 3. Update Individual Player Stats (Cumulative)
+      for (const p of playersStatsUpdates) {
+        const pRef = db.collection('players').doc(p.id);
+        const pDoc = await pRef.get();
+        if (pDoc.exists) {
+          const old = pDoc.data().stats || {};
+          const news = p.stats;
+          // Sum up stats
+          const updated = {};
+          Object.keys(news).forEach(k => {
+            if (typeof news[k] === 'number') updated[k] = (old[k] || 0) + news[k];
+          });
+          updated.gp = (old.gp || 0) + 1; // Games Played
+          await pRef.update({ stats: updated });
+        }
+      }
+
+      // 4. Update Team Record (Wins/Losses)
+      const tRef = db.collection('teams').doc(teamId);
+      const tDoc = await tRef.get();
+      if (tDoc.exists) {
+        const tData = tDoc.data();
+        const wins = (tData.wins || 0) + (hs > as_ ? 1 : 0);
+        const losses = (tData.losses || 0) + (hs < as_ ? 1 : 0);
+        await tRef.update({ wins, losses });
+      }
+    }
+
+    showToast('¡Partido finalizado y estadísticas guardadas! ✓', 'success');
+    navigateTo('game-recap', { gameId });
   };
+
+// ===================== VIEW: GAME LIVE (VIEW ONLY FOR PARENTS) =====================
+async function renderGameLiveViewOnly(container, { gameId, teamName }) {
+  container.innerHTML = `
+    <div style="background:var(--bg-dark);padding:12px 16px;display:flex;align-items:center;border-bottom:1px solid var(--glass-border);position:sticky;top:0;z-index:20">
+      <button class="back-btn" style="margin:0" onclick="goBack()">‹ Volver</button>
+      <div style="margin-left:auto;display:flex;align-items:center" class="live-badge"><div class="live-dot"></div>&nbsp;EN VIVO</div>
+    </div>
+    <div class="loader"><div class="spinner"></div></div>`;
+
+  if (IS_DEMO_MODE) {
+    container.innerHTML = `<div class="empty-state">Modo demo activo. Configura Firebase para ver partidos en vivo.</div>`;
+    return;
+  }
+
+  // Real-time listener
+  const unsubscribe = db.collection('games').doc(gameId).onSnapshot(doc => {
+    if (!doc.exists) return;
+    const g = doc.data();
+    
+    // Check if finished
+    if (g.status === 'finished') {
+       unsubscribe();
+       showToast('El partido ha finalizado', 'info');
+       navigateTo('team-detail', { teamId: g.teamId });
+       return;
+    }
+
+    const timerMin = Math.floor((g.timer||0)/60);
+    const timerSec = (g.timer||0)%60;
+    const fmtTime = `${String(timerMin).padStart(2,'0')}:${String(timerSec).padStart(2,'0')}`;
+
+    const playersOn = (g.liveFouls || []).filter(p => p.on);
+    const playersOff = (g.liveFouls || []).filter(p => !p.on);
+
+    container.innerHTML = `
+      <div style="background:var(--bg-dark);padding:12px 16px;display:flex;align-items:center;border-bottom:1px solid var(--glass-border);position:sticky;top:0;z-index:20">
+        <button class="back-btn" style="margin:0" onclick="goBack()">‹ Volver</button>
+        <div style="margin-left:auto;display:flex;align-items:center" class="live-badge"><div class="live-dot"></div>&nbsp;EN VIVO</div>
+      </div>
+
+      <!-- Main Scoreboard -->
+      <div style="background:linear-gradient(135deg, var(--primary), #FF8A00);padding:32px 16px;text-align:center;color:white;box-shadow: 0 10px 30px rgba(0,0,0,0.3)">
+        <div style="font-size:12px;font-weight:800;letter-spacing:2px;text-transform:uppercase;opacity:0.8;margin-bottom:20px">
+           ${g.quarter === 'PR' ? 'PRÓRROGA' : 'CUARTO ' + (g.quarter||1)} &nbsp;•&nbsp; ${fmtTime}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px">
+           <div>
+             <div style="font-size:14px;font-weight:700;margin-bottom:8px">${teamName}</div>
+             <div style="font-size:64px;font-weight:900;line-height:1">${g.homeScore||0}</div>
+           </div>
+           <div style="font-size:32px;opacity:0.4;font-weight:200">:</div>
+           <div>
+             <div style="font-size:14px;font-weight:700;margin-bottom:8px">RIVAL</div>
+             <div style="font-size:64px;font-weight:900;line-height:1">${g.awayScore||0}</div>
+           </div>
+        </div>
+      </div>
+
+      <!-- Players on Court -->
+      <div style="padding:24px 16px 8px">
+        <div class="section-title" style="font-size:14px;color:var(--primary)">🔥 EN PISTA</div>
+      </div>
+      <div style="padding:0 16px">
+        ${playersOn.length ? playersOn.map(p => `
+          <div style="background:var(--glass);border:1px solid var(--glass-border);padding:14px;border-radius:16px;margin-bottom:10px;display:flex;align-items:center;gap:12px">
+            <div style="width:36px;height:36px;background:rgba(255,107,44,0.1);color:var(--primary);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900">#${p.number||'?'}</div>
+            <div style="flex:1">
+               <div style="font-weight:700;font-size:15px">${p.name}</div>
+               <div style="display:flex;gap:4px;margin-top:4px">
+                  ${Array(5).fill(0).map((_,i) => `
+                    <div style="width:8px;height:8px;border-radius:50%;background:${i < p.pf ? (p.pf >= 4 ? 'var(--danger)' : 'var(--primary)') : 'rgba(255,255,255,0.1)'}"></div>
+                  `).join('')}
+               </div>
+            </div>
+            <div style="text-align:right">
+               <div style="font-size:10px;color:var(--text-3);font-weight:700">FALTAS</div>
+               <div style="font-size:16px;font-weight:900;color:${p.pf >= 4 ? 'var(--danger)' : 'var(--text-1)'}">${p.pf}/5</div>
+            </div>
+          </div>
+        `).join('') : '<div style="padding:20px;text-align:center;color:var(--text-3);font-size:13px">Esperando rotación...</div>'}
+      </div>
+
+      <!-- Bench -->
+      <div style="padding:20px 16px 8px">
+        <div class="section-title" style="font-size:14px;opacity:0.6">🛋️ BANQUILLO</div>
+      </div>
+      <div style="padding:0 16px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          ${playersOff.map(p => `
+            <div style="background:rgba(255,255,255,0.03);padding:10px;border-radius:12px;display:flex;align-items:center;gap:8px">
+              <div style="font-size:11px;font-weight:900;color:var(--text-3)">#${p.number||'?'}</div>
+              <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name.split(' ')[0]}</div>
+              <div style="margin-left:auto;font-size:11px;color:var(--text-3)">${p.pf}F</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <div style="height:32px"></div>
+    `;
+  });
+
+  // Cleanup on view change
+  APP.currentUnsubscribe = unsubscribe;
+}
 
   // Long-press to subtract
   let holdTimer = null;
