@@ -138,6 +138,10 @@ function navigateTo(view, params = {}, addHistory = true) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const nav = document.getElementById('nav-' + (VIEW_TO_NAV[view] || 'home'));
   if (nav) nav.classList.add('active');
+  if (view === 'game-live' || view === 'game-live-view') {
+    const navEl = document.getElementById('bottomNav');
+    if (navEl) navEl.style.display = 'none';
+  }
 
   const main = document.getElementById('appMain');
   const navEl = document.getElementById('bottomNav');
@@ -1066,7 +1070,7 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
 
   // Update Firestore for Live tracking (Parents view this)
   async function syncLiveToFirebase() {
-    if (IS_DEMO_MODE || !gameId) return;
+    if (IS_DEMO_MODE || !gameId || window._isPractice) return;
     const update = {
       homeScore: homeScore(),
       awayScore: awayScore,
@@ -1325,6 +1329,14 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
   window.awayAdj = (d) => {
     awayScore = Math.max(0, awayScore + d);
     document.getElementById('lvAwayScore').textContent = awayScore;
+  };
+
+  window.nextQuarter = () => {
+    quarter++;
+    const el = document.getElementById('lvQuarter');
+    if (el) el.textContent = 'Q' + quarter;
+    showToast(`Empezando Cuarto ${quarter}`, 'info');
+    syncLiveToFirebase();
   };
 
   window.toggleTimer = () => {
