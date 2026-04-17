@@ -245,9 +245,14 @@ async function getGames(teamId = null) {
 async function getMessages() {
   if (IS_DEMO_MODE) return [...DEMO_DATA.messages];
   try {
-    const snap = await db.collection('messages').where('recipientId','in',['all', APP.user.uid]).orderBy('date','desc').get();
+    const isAdmin = APP.userData.role === 'admin';
+    let q = db.collection('messages');
+    if (!isAdmin) {
+      q = q.where('recipientId', 'in', ['all', APP.userData.teamId || 'none', APP.userData.id]);
+    }
+    const snap = await q.orderBy('date', 'desc').get();
     return snap.docs.map(d => ({ id:d.id, ...d.data() }));
-  } catch(e) { return []; }
+  } catch(e) { console.error(e); return []; }
 }
 
 async function getNews() {
@@ -1852,6 +1857,7 @@ async function renderMessages(container) {
         <div class="message-content">
           <div class="message-title ${!m.read?'unread':''}">${m.title}</div>
           <div class="message-preview">${m.body}</div>
+          ${isAdmin ? `<div style="font-size:9px;color:var(--primary);font-weight:900;margin-top:4px;text-transform:uppercase">PARA: ${m.recipientId === 'all' ? 'TODO EL CLUB' : (m.targetName || m.recipientId)}</div>` : ''}
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0">
           <div class="message-time">${fmtTimeAgo(m.date)}</div>
@@ -2052,7 +2058,7 @@ async function renderAdmin(container) {
         <div class="stat-value">🛡️</div>
         <div class="stat-label">Equipos</div>
       </div>
-      <div class="stat-card" onclick="navigateTo('admin-players')">
+      <div class="stat-card" onclick="navigateTo('admin-users')">
         <div class="stat-value">👥</div>
         <div class="stat-label">Jugadores</div>
       </div>
