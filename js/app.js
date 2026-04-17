@@ -1288,17 +1288,18 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
       <div class="stat-btn-grid">
         ${STAT_BTNS.map(b => `
           <div class="stat-btn" data-stat="${b.stat}"
-            ontouchstart="startHold('${b.stat}')" ontouchend="endHold()"
-            ontouchcancel="endHold()"
             onclick="addStat(selPlayerId,'${b.stat}')">
             <div class="stat-btn-icon">${b.icon}</div>
             <div class="stat-btn-count" id="cnt_${b.stat}">0</div>
             <div class="stat-btn-label">${b.label}</div>
           </div>`).join('')}
+          <!-- Botón deshacer (borrar último) -->
+          <div class="stat-btn" onclick="undoLastAction()" style="border-color:rgba(255,68,68,0.25);background:rgba(255,68,68,0.05)">
+            <div class="stat-btn-icon">↩️</div>
+            <div class="stat-btn-count" style="color:var(--danger);font-size:14px;padding-top:6px">UNDO</div>
+            <div class="stat-btn-label">BORRAR ÚLTIMO</div>
+          </div>
       </div>
-      <p style="text-align:center;font-size:11px;color:var(--text-3);padding:4px 16px 24px">
-        Toca para +1 · Mantén 1 segundo para −1
-      </p>
     </div>`;
 
   // Attach event listeners and initial UI state
