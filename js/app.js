@@ -1000,13 +1000,9 @@ const STAT_BTNS = [
 ];
 
 async function renderGameLive(container, { teamId, teamName, gameId, isPractice }) {
-  // Capture practice mode
   window._isPractice = !!isPractice;
-  
-  // Show loader while fetching players
   container.innerHTML = `<div class="loader"><div class="spinner"></div></div>`;
   
-  // Fetch real players if not in demo mode
   let players = [];
   if (IS_DEMO_MODE) {
     players = DEMO_DATA.players.filter(p => p.teamId === (teamId||'t1'));
@@ -1022,13 +1018,16 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
   const liveStats = {};
   players.forEach(p => { 
     liveStats[p.id] = { 
-      pts_1:0, pts_2:0, pts_3:0, reb_off:0, reb_def:0, ast:0, stl:0, blk:0, to:0, pf:0,
-      mins: 0, onCourt: false 
+      pts_1:0, pts_layup:0, pts_jump:0, pts_3:0, 
+      miss_1:0, miss_layup:0, miss_jump:0, miss_3:0,
+      reb_off:0, reb_def:0, ast:0, stl:0, blk:0, to:0, pf:0, f_drawn:0,
+      mins: 0, plusMinus: 0, onCourt: false, qMins: {}
     }; 
   });
 
   let selPlayerId = players[0]?.id || null;
   let awayScore   = 0;
+  let teamFouls   = 0;
   let timerSec    = 0;
   let timerOn     = false;
   let timerInt    = null;
@@ -1046,10 +1045,15 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
         liveStats[pid].onCourt = !liveStats[pid].onCourt;
       } else {
         liveStats[pid][stat] = Math.max(0, (liveStats[pid][stat]||0) - 1);
-        // If it was a shot from court, remove last shot from player's array
         if (last.fromCourt && liveStats[pid].shots) {
           liveStats[pid].shots.pop();
         }
+        // Reverse Plus/Minus
+        if (stat.startsWith('pts_')) {
+          let pts = stat === 'pts_1' ? 1 : (stat === 'pts_3' ? 3 : 2);
+          updatePlusMinus(-pts, true);
+        }
+        if (stat === 'pf') teamFouls = Math.max(0, teamFouls - 1);
       }
       showToast('Acción deshecha','info');
       refreshLiveUI();
@@ -1068,7 +1072,6 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
     return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`; 
   }
 
-  // Update Firestore for Live tracking (Parents view this)
   async function syncLiveToFirebase() {
     if (IS_DEMO_MODE || !gameId || window._isPractice) return;
     const update = {
@@ -1084,24 +1087,44 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
   }
 
   function addStat(pid, stat, fromCourt = false) {
-    if (!pid) return;
-    if (!liveStats[pid]) liveStats[pid] = {};
-    
-    // Save to history
-    actionHistory.push({ pid, stat, fromCourt });
+    if (!pid || !liveStats[pid]) return;
+    actionHistory.push({ pid, stat, fromCourt, quarter });
     
     if (stat === 'mins') {
       liveStats[pid].onCourt = !liveStats[pid].onCourt;
       showToast(liveStats[pid].onCourt ? 'Entra a pista' : 'Sale al banquillo', 'info');
     } else {
       liveStats[pid][stat] = (liveStats[pid][stat]||0) + 1;
+      if (stat.startsWith('pts_')) {
+        let pts = stat === 'pts_1' ? 1 : (stat === 'pts_3' ? 3 : 2);
+        updatePlusMinus(pts, true);
+      }
+      if (stat === 'pf') {
+        teamFouls++;
+        if (teamFouls >= 4) showToast('¡EN BONUS! El equipo rival tira tiros libres.', 'warning');
+      }
       flashFeedback(stat);
     }
     refreshLiveUI();
     syncLiveToFirebase();
   }
 
-  // Handle Court Click (Moved inside setup but will be attached after innerHTML)
+  function updatePlusMinus(points, isHomeScore) {
+    players.forEach(p => {
+      if (liveStats[p.id].onCourt) {
+        if (isHomeScore) liveStats[p.id].plusMinus += points;
+        else liveStats[p.id].plusMinus -= points;
+      }
+    });
+  }
+
+  function calculateVal(s) {
+    const pts = (s.pts_1||0)*1 + ((s.pts_layup||0)+(s.pts_jump||0))*2 + (s.pts_3||0)*3;
+    const fallos = (s.miss_1||0) + (s.miss_layup||0) + (s.miss_jump||0) + (s.miss_3||0);
+    return (pts + (s.reb_off||0) + (s.reb_def||0) + (s.ast||0) + (s.stl||0) + (s.blk||0) + (s.f_drawn||0)) 
+           - (fallos + (s.to||0) + (s.pf||0));
+  }
+
   const setupEventListeners = () => {
     const shotCourt = document.getElementById('shotCourt');
     if (shotCourt) {
@@ -1110,13 +1133,10 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
         const rect = e.currentTarget.getBoundingClientRect();
         const x = ((e.clientX - rect.left) / rect.width) * 100;
         const y = ((e.clientY - rect.top) / rect.height) * 100;
-        
-        // Determine zones
-        let type = '2p'; // Default
+        let type = '2p';
         const dist = Math.sqrt(Math.pow(x-50,2) + Math.pow(y-10,2));
         if (dist > 42 || x < 5 || x > 95) type = '3p';
         else if (dist < 18) type = 'entrada';
-        
         openShotModal(x, y, type);
       };
     }
@@ -1138,8 +1158,6 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
     const pid = selPlayerId;
     if (!liveStats[pid].shots) liveStats[pid].shots = [];
     liveStats[pid].shots.push({ x, y, made, type });
-    
-    // Add to stats
     if (made) {
       if (type === '3p') addStat(pid, 'pts_3', true);
       else if (type === 'entrada') addStat(pid, 'pts_layup', true);
@@ -1152,52 +1170,49 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
     showToast(`${made ? '¡Canasta!' : 'Fallo...'} registrada ✓`, made ? 'success' : 'info');
   };
 
-  function removeStat(pid, stat) {
-    if (!pid || !liveStats[pid]) return;
-    liveStats[pid][stat] = Math.max(0, (liveStats[pid][stat]||0) - 1);
-    refreshLiveUI();
-  }
-
   function refreshLiveUI() {
     const hEl = document.getElementById('lvHomeScore');
     if (hEl) hEl.textContent = homeScore();
     
-    // Update player on-court indicators
-    players.forEach(p => {
-      const btn = document.querySelector(`.psBtn[data-pid="${p.id}"]`);
-      if (btn) {
-        const dot = liveStats[p.id].onCourt ? '🟢' : '⚪';
-        const fouls = liveStats[p.id].pf >= 4 ? ' ⚠️' : '';
-        btn.querySelector('.psStatus').textContent = dot + fouls;
+    const psList = document.getElementById('playerQuickStats');
+    if (psList) {
+      psList.innerHTML = players.map(p => {
+        const s = liveStats[p.id];
+        const val = calculateVal(s);
+        const foulWarn = s.pf >= 4 ? 'color:#FF4444;font-weight:900;animation:pulse 1s infinite' : '';
+        return `
+          <div class="psBtn" onclick="selectPlayer('${p.id}', this)" style="${p.id === selPlayerId ? 'border-color:var(--primary);background:rgba(255,107,44,0.12);color:var(--primary)' : ''}">
+            <div style="display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;padding-bottom:2px">
+               <span style="font-size:10px;font-weight:800;opacity:0.8">${p.number||'00'}</span>
+               <span style="width:6px;height:6px;border-radius:50%;background:${s.onCourt ? '#4CAF50' : '#888'}"></span>
+            </div>
+            <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;font-size:11px;font-weight:700">${p.name.split(' ')[0]}</div>
+            <div style="font-size:9px;opacity:0.6;display:flex;justify-content:space-between;width:100%;padding-top:4px">
+               <span>+/- ${s.plusMinus > 0 ? '+' : ''}${s.plusMinus}</span>
+               <span style="${foulWarn}">F:${s.pf}</span>
+               <span style="font-weight:700">VAL:${val}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    const bonusEl = document.getElementById('teamBonus');
+    if (bonusEl) {
+      if (teamFouls >= 4) {
+        bonusEl.innerHTML = `<span style="background:var(--primary);color:white;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:900">BONUS</span>`;
+      } else {
+        bonusEl.innerHTML = `<div style="display:flex;gap:3px">${Array(4).fill(0).map((_,i)=>`<div style="width:6px;height:6px;border-radius:50%;background:${i<teamFouls?'var(--primary)':'rgba(255,255,255,0.1)'}"></div>`).join('')}</div>`;
       }
-    });
+    }
 
     if (!selPlayerId) return;
     const s = liveStats[selPlayerId] || {};
     STAT_BTNS.forEach(b => {
       const cnt = document.getElementById('cnt_'+b.stat);
-      if (!cnt) return;
-      if (b.stat === 'mins') {
-         cnt.textContent = Math.floor(s.mins / 60) + "m";
-      } else {
-         cnt.textContent = s[b.stat]||0;
-      }
+      if (cnt) cnt.textContent = s[b.stat]||0;
     });
   }
-
-  const STAT_BTNS = [
-    { stat:'pts_1',   label:'T. Libre', icon:'🎯' },
-    { stat:'miss_1',  label:'X Libre',  icon:'❌' },
-    { stat:'reb_off', label:'Reb. Off', icon:'💪' },
-    { stat:'reb_def', label:'Reb. Def', icon:'🛡️' },
-    { stat:'ast',     label:'Asistencia', icon:'🤝' },
-    { stat:'stl',     label:'Robo',     icon:'🔒' },
-    { stat:'blk',     label:'Tapón',    icon:'✋' },
-    { stat:'to',      label:'Pérdida',  icon:'⚠️' },
-    { stat:'pf',      label:'Falta C.',  icon:'🚫' },
-    { stat:'f_drawn', label:'Falta R.',  icon:'🩹' },
-    { stat:'mins',    label:'Sustituir', icon:'🔄' },
-  ];
 
   const FEEDBACK_LABELS = { pts_1:'+1PT', miss_1:'MISS', pts_layup:'+2PT', pts_jump:'+2PT', miss_2:'MISS', pts_3:'+3PT', miss_3:'MISS', reb_off:'REB.O', reb_def:'REB.D', ast:'AST', stl:'ROB', blk:'TAP', to:'PÉR', pf:'FALTA', f_drawn:'FALTA↗', mins:'SUST.' };
 
@@ -1212,7 +1227,6 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
   }
 
   container.innerHTML = `
-    <!-- Live top bar -->
     <div style="background:var(--bg-dark);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--glass-border);position:sticky;top:0;z-index:20">
       <button style="background:none;border:none;color:var(--primary);font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font)" onclick="goBack()">← Salir</button>
       <div class="live-badge"><div class="live-dot"></div>&nbsp;EN VIVO</div>
@@ -1222,7 +1236,6 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
       </div>
     </div>
 
-    <!-- Scoreboard -->
     <div style="background:linear-gradient(135deg,rgba(255,107,44,0.1),rgba(255,107,44,0.04));padding:20px 16px;border-bottom:1px solid var(--glass-border)">
       <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;text-align:center;margin-bottom:16px">
         <div>
@@ -1230,13 +1243,13 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
           <div style="font-size:56px;font-weight:900;color:var(--primary);line-height:1" id="lvHomeScore">0</div>
         </div>
         <div style="font-size:22px;color:var(--text-3)">—</div>
-        <div>
-          <div style="font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:4px">Rival</div>
-          <div style="display:flex;align-items:center;justify-content:center;gap:8px">
-            <button onclick="awayAdj(-1)" style="width:30px;height:30px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:white;font-size:18px;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center">−</button>
-            <div style="font-size:56px;font-weight:900;color:var(--text-2);line-height:1" id="lvAwayScore">0</div>
-            <button onclick="awayAdj(1)" style="width:30px;height:30px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:white;font-size:18px;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center">+</button>
-          </div>
+        <div style="text-align:right">
+            <div style="font-size:12px;color:rgba(255,255,255,0.6);font-weight:700;margin-bottom:4px">Rival</div>
+            <div style="display:flex;align-items:center;gap:12px">
+               <button onclick="awayAdj(-1)" style="width:30px;height:30px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:white;font-size:18px;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center">−</button>
+               <div id="lvAwayScore" style="font-size:48px;font-weight:900;color:white;line-height:1">0</div>
+               <button onclick="awayAdj(1)" style="width:30px;height:30px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:white;font-size:18px;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center">+</button>
+            </div>
         </div>
       </div>
 
@@ -1246,12 +1259,11 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
         <div style="font-size:12px;color:var(--text-2);font-weight:700" id="lvQuarter">Q${quarter}</div>
         <button onclick="nextQuarter()" style="background:var(--glass);border:1px solid var(--glass-border);color:var(--text-1);font-size:11px;font-weight:700;padding:6px 10px;border-radius:8px;cursor:pointer;font-family:var(--font)">Q+</button>
       </div>
+      <div style="display:flex;justify-content:center;margin-top:4px" id="teamBonus"></div>
     </div>
 
-    <!-- Feedback Flash -->
     <div id="liveFeedback" style="position:fixed;top:200px;left:50%;transform:translateX(-50%) translateY(4px);background:var(--primary);color:white;font-size:20px;font-weight:900;padding:7px 20px;border-radius:12px;opacity:0;transition:all 0.25s;z-index:50;pointer-events:none;box-shadow:var(--shadow-primary)"></div>
 
-    <!-- INTERACTIVE COURT -->
     <div style="padding:0 16px 16px">
       <div style="font-size:10px;color:var(--text-3);font-weight:800;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Ubicación del tiro (Mapa de Calor)</div>
       <div id="shotCourt" style="width:100%;aspect-ratio:1.1;background:#1E293B;border-radius:16px;position:relative;border:2px solid var(--glass-border);overflow:hidden;cursor:crosshair">
@@ -1262,25 +1274,14 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
           <circle cx="50" cy="40" r="15" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
           <circle cx="50" cy="10" r="2.5" fill="none" stroke="var(--primary)" stroke-width="2"/>
         </svg>
-        <div id="shotMarker" style="position:absolute;width:12px;height:12px;border-radius:50%;background:white;display:none;transform:translate(-50%,-50%);box-shadow:0 0 10px white"></div>
       </div>
     </div>
 
-    <!-- Player Selection (FIXED INJECTION) -->
     <div style="padding:0 16px 20px">
       <div style="font-size:10px;color:var(--text-3);font-weight:800;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Seleccionar Jugadora</div>
-      <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;scrollbar-width:none" id="playerQuickStats">
-        ${players.map(p => `
-          <div class="psBtn ${p.id === selPlayerId ? 'active' : ''}" data-pid="${p.id}" onclick="selectPlayer('${p.id}', this)">
-            <div class="psNum">${p.number || '00'}</div>
-            <div class="psName">${p.name.split(' ')[0]}</div>
-            <div class="psStatus">⚪</div>
-          </div>
-        `).join('')}
-      </div>
+      <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;scrollbar-width:none" id="playerQuickStats"></div>
     </div>
 
-    <!-- Stat buttons -->
     <div style="background:var(--bg-card);border-radius:28px 28px 0 0;padding-top:16px;margin-top:0">
       <div style="padding:0 16px 12px;text-align:center">
          <span id="selPlayerLabel" style="font-size:16px;font-weight:900;color:var(--primary)">${players.find(p=>p.id===selPlayerId)?.name || 'Selecciona Jugadora'}</span>
@@ -1293,34 +1294,17 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
             <div class="stat-btn-count" id="cnt_${b.stat}">0</div>
             <div class="stat-btn-label">${b.label}</div>
           </div>`).join('')}
-          <!-- Botón deshacer (borrar último) -->
-          <div class="stat-btn" onclick="undoLastAction()" style="border-color:rgba(255,68,68,0.25);background:rgba(255,68,68,0.05)">
-            <div class="stat-btn-icon">↩️</div>
-            <div class="stat-btn-count" style="color:var(--danger);font-size:14px;padding-top:6px">UNDO</div>
-            <div class="stat-btn-label">BORRAR ÚLTIMO</div>
-          </div>
       </div>
     </div>`;
 
-  // Attach event listeners and initial UI state
   setupEventListeners();
   refreshLiveUI();
 
-  // expose to global scope
   window.selPlayerId = selPlayerId;
   window.addStat     = addStat;
-  window.removeStat  = removeStat;
 
   window.selectPlayer = (pid, btn) => {
     selPlayerId = pid; window.selPlayerId = pid;
-    document.querySelectorAll('.psBtn').forEach(b => {
-      b.style.borderColor = 'var(--glass-border)';
-      b.style.background  = 'var(--glass)';
-      b.style.color       = 'var(--text-1)';
-    });
-    btn.style.borderColor = 'var(--primary)';
-    btn.style.background  = 'rgba(255,107,44,0.12)';
-    btn.style.color       = 'var(--primary)';
     const pl = players.find(p => p.id === pid);
     const lbl = document.getElementById('selPlayerLabel');
     if (lbl && pl) lbl.textContent = pl.name;
@@ -1330,13 +1314,20 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
   window.awayAdj = (d) => {
     awayScore = Math.max(0, awayScore + d);
     document.getElementById('lvAwayScore').textContent = awayScore;
+    if (d > 0) updatePlusMinus(d, false);
   };
 
   window.nextQuarter = () => {
+    if (timerOn) window.toggleTimer();
     quarter++;
+    teamFouls = 0;
+    timerSec = 0;
     const el = document.getElementById('lvQuarter');
     if (el) el.textContent = 'Q' + quarter;
-    showToast(`Empezando Cuarto ${quarter}`, 'info');
+    const tEl = document.getElementById('lvTimer');
+    if (tEl) tEl.textContent = '00:00';
+    showToast(`Empezando Cuarto ${quarter}. Bonus reseteado.`, 'info');
+    refreshLiveUI();
     syncLiveToFirebase();
   };
 
@@ -1347,21 +1338,15 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
       if (btn) btn.textContent = '⏸ Pausar';
       timerInt = setInterval(() => {
         timerSec++;
-        // Track individual minutes for players on court
-        players.forEach(p => { 
-          if (liveStats[p.id].onCourt) liveStats[p.id].mins++; 
-        });
-        
+        players.forEach(p => { if (liveStats[p.id].onCourt) liveStats[p.id].mins++; });
         const el = document.getElementById('lvTimer');
         if (el) el.textContent = fmtTimer(timerSec);
-        
-        // Sync to firebase every 10 seconds for parents
         if (timerSec % 10 === 0) syncLiveToFirebase();
       }, 1000);
     } else {
       if (btn) btn.textContent = '▶ Reanudar';
       clearInterval(timerInt);
-      syncLiveToFirebase(); // Final sync on pause
+      syncLiveToFirebase();
     }
   };
 
@@ -1373,30 +1358,24 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
     
     showToast('Calculando estadísticas y MVP...', 'info');
     
-    // 1. Calculate MVP (by Efficiency/Valoración)
     let mvp = null;
     let maxVal = -999;
     
     const playersStatsUpdates = players.map(p => {
       const s = liveStats[p.id];
       const pts = (s.pts_1*1) + (s.pts_layup*2) + (s.pts_jump*2) + (s.pts_3*3);
-      const val = pts + s.reb_off + s.reb_def + s.ast + s.stl + s.blk + s.f_drawn - s.to 
-                  - (s.miss_1||0) - (s.miss_2||0) - (s.miss_3||0);
+      const val = calculateVal(s);
       if (val > maxVal) { maxVal = val; mvp = { id:p.id, name:p.name, val:val, pts:pts }; }
-      
       return { id:p.id, stats: { ...s, pts, val } };
     });
 
-    // Practice handling
     if (window._isPractice) {
        showToast('Simulacro finalizado. Datos no guardados en el club.','info');
        navigateTo('game-recap', { gameId: 'practice' }); 
-       // We'll store practice data in a global var temporarily for the recap
        window._practiceData = { playerStats: playersStatsUpdates.reduce((acc,p)=>{acc[p.id]=p.stats; return acc;}, {}), mvp, homeScore: hs, awayScore: as_ };
        return;
     }
 
-    // 2. Official Save with Offline Protection
     if (!IS_DEMO_MODE && gameId) {
       try {
         await db.collection('games').doc(gameId).update({ 
@@ -1405,7 +1384,6 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
           lastUpdate: firebase.firestore.FieldValue.serverTimestamp()
         });
 
-        // 3. Update Cumulative Stats
         for (const p of playersStatsUpdates) {
           const pRef = db.collection('players').doc(p.id);
           const pDoc = await pRef.get();
@@ -1421,7 +1399,6 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
           }
         }
 
-        // 4. Update Team Record
         const tRef = db.collection('teams').doc(teamId);
         const tDoc = await tRef.get();
         if (tDoc.exists) {
@@ -1443,13 +1420,11 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
               Parece que no hay internet. No cierres la app o se perderán los datos.
             </p>
             <button class="btn-full btn-primary-full" onclick="endGameConfirm()">🔄 Reintentar Registro</button>
-
           </div>
         `);
         return;
       }
     }
-
     navigateTo('game-recap', { gameId });
   };
 }
@@ -1475,7 +1450,6 @@ async function renderGameRecap(container, { gameId }) {
       <div style="margin-left:auto;font-size:12px;font-weight:800;color:var(--text-3)">INFORME FINAL</div>
     </div>
 
-    <!-- Final Score Hero -->
     <div style="background:linear-gradient(180deg, rgba(255,107,44,0.1) 0%, transparent 100%);padding:40px 16px;text-align:center">
       <div style="font-size:12px;font-weight:900;color:var(--primary);letter-spacing:2px;margin-bottom:12px">RESULTADO FINAL</div>
       <div style="display:flex;align-items:center;justify-content:center;gap:20px">
@@ -1485,7 +1459,6 @@ async function renderGameRecap(container, { gameId }) {
       </div>
     </div>
 
-    <!-- MVP Section -->
     ${g.mvp ? `
     <div style="padding:0 16px 24px">
       <div style="background:linear-gradient(135deg,rgba(255,184,0,0.1),rgba(255,184,0,0.02));border:1px solid rgba(255,184,0,0.2);border-radius:24px;padding:24px;text-align:center">
@@ -1495,7 +1468,6 @@ async function renderGameRecap(container, { gameId }) {
       </div>
     </div>` : ''}
 
-    <!-- HEAT MAP SECTION -->
     <div style="padding:0 16px 32px">
       <div class="section-title" style="margin-bottom:16px;font-size:14px">MAPA DE TIRO DEL PARTIDO 🎯</div>
       <div style="background:#1E293B;border-radius:24px;border:1px solid var(--glass-border);position:relative;aspect-ratio:1.1;overflow:hidden">
@@ -1511,7 +1483,6 @@ async function renderGameRecap(container, { gameId }) {
       </div>
     </div>
 
-    <!-- PRIVATE COACH REPORT -->
     ${['admin','coach'].includes(APP.userData?.role) ? `
     <div style="padding:16px">
       <div style="background:#0F172A;border:1px solid #1E293B;border-radius:24px;padding:20px">
@@ -1572,12 +1543,9 @@ async function renderGameLiveViewOnly(container, { gameId, teamName }) {
     return;
   }
 
-  // Real-time listener
   const unsubscribe = db.collection('games').doc(gameId).onSnapshot(doc => {
     if (!doc.exists) return;
     const g = doc.data();
-    
-    // Check if finished
     if (g.status === 'finished') {
        unsubscribe();
        showToast('El partido ha finalizado', 'info');
@@ -1598,7 +1566,6 @@ async function renderGameLiveViewOnly(container, { gameId, teamName }) {
         <div style="margin-left:auto;display:flex;align-items:center" class="live-badge"><div class="live-dot"></div>&nbsp;EN VIVO</div>
       </div>
 
-      <!-- Main Scoreboard -->
       <div style="background:linear-gradient(135deg, var(--primary), #FF8A00);padding:32px 16px;text-align:center;color:white;box-shadow: 0 10px 30px rgba(0,0,0,0.3)">
         <div style="font-size:12px;font-weight:800;letter-spacing:2px;text-transform:uppercase;opacity:0.8;margin-bottom:20px">
            ${g.quarter === 'PR' ? 'PRÓRROGA' : 'CUARTO ' + (g.quarter||1)} &nbsp;•&nbsp; ${fmtTime}
@@ -1616,7 +1583,6 @@ async function renderGameLiveViewOnly(container, { gameId, teamName }) {
         </div>
       </div>
 
-      <!-- Players on Court -->
       <div style="padding:24px 16px 8px">
         <div class="section-title" style="font-size:14px;color:var(--primary)">🔥 EN PISTA</div>
       </div>
@@ -1640,7 +1606,6 @@ async function renderGameLiveViewOnly(container, { gameId, teamName }) {
         `).join('') : '<div style="padding:20px;text-align:center;color:var(--text-3);font-size:13px">Esperando rotación...</div>'}
       </div>
 
-      <!-- Bench -->
       <div style="padding:20px 16px 8px">
         <div class="section-title" style="font-size:14px;opacity:0.6">🛋️ BANQUILLO</div>
       </div>
@@ -1658,12 +1623,8 @@ async function renderGameLiveViewOnly(container, { gameId, teamName }) {
       <div style="height:32px"></div>
     `;
   });
-
-  // Cleanup on view change
   APP.currentUnsubscribe = unsubscribe;
 }
-
-
 
 // ===================== VIEW: MESSAGES =====================
 async function renderMessages(container) {
@@ -2123,7 +2084,6 @@ function roleLabelRaw(r) {
     const teamId   = document.getElementById('nuTeam').value;
     const photo    = document.getElementById('nuPhotoInput').dataset.base64 || null;
 
-    // Player extras
     const pNumInput = document.getElementById('nuPlayerNum').value.trim();
     const pNum      = pNumInput === '' ? 0 : parseInt(pNumInput);
     const pPos      = document.getElementById('nuPlayerPos').value;
@@ -2143,7 +2103,6 @@ function roleLabelRaw(r) {
         const nu   = await sec.auth().createUserWithEmailAndPassword(email,pass);
         const uid  = nu.user.uid;
 
-        // 1. Create User Account
         await db.collection('users').doc(uid).set({ 
           name, birthDate:birth, phone, photo,
           guardian: age < 18 ? guardian : null,
@@ -2152,10 +2111,9 @@ function roleLabelRaw(r) {
           createdAt:firebase.firestore.FieldValue.serverTimestamp() 
         });
 
-        // 2. If it's a player and has team, create Player Profile automatically
         if (role === 'player' && teamId) {
           await db.collection('players').add({
-            uid, photo, // Pass photo to player doc too
+            uid, photo,
             name, age, number:parseInt(pNum), position:pPos, teamId,
             guardian: age < 18 ? guardian : null,
             parentPhone: age < 18 ? pPhone : null,
@@ -2282,7 +2240,6 @@ function roleLabelRaw(r) {
 
     if (!IS_DEMO_MODE) {
       await db.collection('users').doc(userId).update(data);
-      // Sync data to player profile if it exists (sports record)
       const psnap = await db.collection('players').where('uid','==',userId).get();
       psnap.forEach(d => {
         const updateObj = { 
@@ -2304,9 +2261,7 @@ function roleLabelRaw(r) {
   window.deleteUser = async (userId) => {
     if (!confirm('¿Estás COMPLETAMENTE SEGURO de querer eliminar este usuario? Perderá el acceso y se borrará su ficha de jugador para siempre.')) return;
     if (!IS_DEMO_MODE) {
-      // 1. Delete access account
       await db.collection('users').doc(userId).delete();
-      // 2. Cascade delete player profile
       const psnap = await db.collection('players').where('uid','==',userId).get();
       psnap.forEach(d => d.ref.delete());
     }
@@ -2454,7 +2409,6 @@ async function renderAdminTeams(container) {
   };
 
   window.showAddPlayerModal = async (teamId) => {
-    // Fetch all users with role 'player'
     const users = await db.collection('users').where('role','==','player').get().then(s => s.docs.map(d=>({id:d.id,...d.data()})));
     
     openModal(`
@@ -2532,10 +2486,7 @@ async function renderAdminTeams(container) {
     const age = birth ? calcAge(birth) : 0;
 
     if (!IS_DEMO_MODE) {
-      // 1. Update user record to link back to team
       await db.collection('users').doc(uid).update({ teamId });
-      
-      // 2. Update or Create player profile (to avoid duplicates)
       const psnap = await db.collection('players').where('uid','==',uid).get();
       const pData = {
         uid, name, age, number:num, position:pos, teamId,
@@ -2546,10 +2497,8 @@ async function renderAdminTeams(container) {
       };
 
       if (!psnap.empty) {
-        // Update existing profile (keeping stats if they exist)
         await psnap.docs[0].ref.update({ name, age, number:num, position:pos, teamId, guardian, active:true });
       } else {
-        // Create new profile
         pData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
         await db.collection('players').add(pData);
       }
