@@ -1213,6 +1213,15 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
       const cnt = document.getElementById('cnt_'+b.stat);
       if (cnt) cnt.textContent = s[b.stat]||0;
     });
+
+    // Actualizar puntos en el mapa de calor en vivo
+    const courtSvg = document.getElementById('courtDynamicShots');
+    if (courtSvg) {
+      const shots = s.shots || [];
+      courtSvg.innerHTML = shots.map(sh => `
+        <circle cx="${sh.x}" cy="${sh.y}" r="2" fill="${sh.made?'#22c55e':'#ef4444'}" style="filter:drop-shadow(0 0 2px ${sh.made?'#22c55e':'#ef4444'})" />
+      `).join('');
+    }
   }
 
   const FEEDBACK_LABELS = { pts_1:'+1PT', miss_1:'MISS', pts_layup:'+2PT', pts_jump:'+2PT', miss_2:'MISS', pts_3:'+3PT', miss_3:'MISS', reb_off:'REB.O', reb_def:'REB.D', ast:'AST', stl:'ROB', blk:'TAP', to:'PÉR', pf:'FALTA', f_drawn:'FALTA↗', mins:'SUST.' };
@@ -1275,6 +1284,7 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
           <circle cx="50" cy="40" r="15" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
           <circle cx="50" cy="10" r="2.5" fill="none" stroke="var(--primary)" stroke-width="2"/>
         </svg>
+        <svg id="courtDynamicShots" viewBox="0 0 100 100" style="width:100%;height:100%;position:absolute;top:0;left:0;pointer-events:none"></svg>
       </div>
     </div>
 
@@ -1300,6 +1310,11 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
 
   setupEventListeners();
   refreshLiveUI();
+
+  // Abrir modal de quinteto si es el inicio del partido
+  if (timerSec === 0) {
+    setTimeout(() => window.openStartingFiveModal(), 400);
+  }
 
   window.selPlayerId = selPlayerId;
   window.addStat     = addStat;
@@ -1333,6 +1348,13 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
   };
 
   window.toggleTimer = () => {
+    const onCourtCount = players.filter(p => liveStats[p.id].onCourt).length;
+    if (onCourtCount !== 5 && !timerOn && timerSec === 0) {
+      showToast('Debes seleccionar el quinteto inicial primero', 'warning');
+      window.openStartingFiveModal();
+      return;
+    }
+
     timerOn = !timerOn;
     const btn = document.getElementById('lvTimerBtn');
     if (timerOn) {
@@ -1349,6 +1371,62 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
       clearInterval(timerInt);
       syncLiveToFirebase();
     }
+  };
+
+  window.openStartingFiveModal = () => {
+    const selected = new Set();
+    players.forEach(p => { if (liveStats[p.id].onCourt) selected.add(p.id); });
+
+    openModal(`
+      <div class="modal-sheet" style="max-height:90vh">
+        <div class="modal-handle"></div>
+        <div class="modal-title">Quinteto Inicial</div>
+        <div class="modal-body" style="padding-bottom:28px">
+          <p style="font-size:12px;color:var(--text-3);margin-bottom:16px;text-align:center">Selecciona las 5 jugadoras que inician el partido</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px" id="s5grid">
+            ${players.map(p => `
+              <div class="s5-card ${selected.has(p.id)?'active':''}" id="s5_${p.id}" onclick="toggleS5Selection('${p.id}')">
+                <div style="font-weight:900;color:var(--primary)">${p.number||'00'}</div>
+                <div style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name.split(' ')[0]}</div>
+              </div>
+            `).join('')}
+          </div>
+          <button class="btn-full btn-primary-full" id="confirmS5Btn" onclick="confirmStartingFive()">Confirmar Quinteto (0/5)</button>
+        </div>
+      </div>
+    `);
+
+    window.toggleS5Selection = (pid) => {
+      if (selected.has(pid)) selected.delete(pid);
+      else if (selected.size < 5) selected.add(pid);
+      else { showToast('Máximo 5 jugadoras','info'); return; }
+      
+      document.querySelectorAll('.s5-card').forEach(c => c.classList.remove('active'));
+      selected.forEach(id => document.getElementById('s5_'+id).classList.add('active'));
+      const btn = document.getElementById('confirmS5Btn');
+      if (btn) {
+        btn.textContent = `Confirmar Quinteto (${selected.size}/5)`;
+        btn.style.opacity = selected.size === 5 ? '1' : '0.5';
+      }
+    };
+
+    window.confirmStartingFive = () => {
+      if (selected.size !== 5) { showToast('Selecciona exactamente 5 jugadoras','warning'); return; }
+      players.forEach(p => {
+        liveStats[p.id].onCourt = selected.has(p.id);
+      });
+      _closeModal();
+      refreshLiveUI();
+      showToast('Quinteto inicial confirmado ✓','success');
+    };
+
+    // Estilo temporal para el grid
+    const s = document.createElement('style');
+    s.innerHTML = `
+      .s5-card { background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:12px; text-align:center; cursor:pointer; transition:all 0.2s; }
+      .s5-card.active { border-color:var(--primary); background:rgba(255,107,44,0.1); }
+    `;
+    document.head.appendChild(s);
   };
 
   window.endGameConfirm = async () => {
