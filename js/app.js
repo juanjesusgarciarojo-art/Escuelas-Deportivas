@@ -1092,6 +1092,10 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
     actionHistory.push({ pid, stat, fromCourt, quarter });
     
     if (stat === 'mins') {
+      if (!liveStats[pid].onCourt && liveStats[pid].pf >= 5) {
+        showToast('No se puede sacar a pista a una jugadora expulsada', 'error');
+        return;
+      }
       liveStats[pid].onCourt = !liveStats[pid].onCourt;
       showToast(liveStats[pid].onCourt ? 'Entra a pista' : 'Sale al banquillo', 'info');
     } else {
@@ -1103,6 +1107,12 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
       if (stat === 'pf') {
         teamFouls++;
         if (teamFouls >= 4) showToast('¡EN BONUS! El equipo rival tira tiros libres.', 'warning');
+        
+        // Regla de las 5 faltas
+        if (liveStats[pid].pf === 5) {
+          showToast(`¡EXPULSADA! ${players.find(p=>p.id===pid).name} ha cometido su 5ª falta`, 'error');
+          setTimeout(() => window.forceSubstitution(pid), 500);
+        }
       }
       flashFeedback(stat);
     }
@@ -1414,6 +1424,7 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
       if (selected.size !== 5) { showToast('Selecciona exactamente 5 jugadoras','warning'); return; }
       players.forEach(p => {
         liveStats[p.id].onCourt = selected.has(p.id);
+        if (selected.has(p.id)) liveStats[p.id].isStarter = true;
       });
       _closeModal();
       refreshLiveUI();
@@ -1427,6 +1438,45 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
       .s5-card.active { border-color:var(--primary); background:rgba(255,107,44,0.1); }
     `;
     document.head.appendChild(s);
+  };
+
+  window.forceSubstitution = (expelledId) => {
+    const expelled = players.find(p => p.id === expelledId);
+    const bench = players.filter(p => !liveStats[p.id].onCourt && liveStats[p.id].pf < 5);
+    
+    if (bench.length === 0) {
+      showToast('No hay jugadoras disponibles en el banquillo para sustituir', 'error');
+      liveStats[expelledId].onCourt = false;
+      refreshLiveUI();
+      return;
+    }
+
+    openModal(`
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div class="modal-title" style="color:var(--danger)">Sustitución Obligatoria</div>
+        <div class="modal-body" style="padding-bottom:28px; text-align:center">
+          <p style="font-size:13px;margin-bottom:20px;opacity:0.8"><b>${expelled.name}</b> ha sido expulsada. Selecciona quién entra en su lugar:</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px">
+            ${bench.map(p => `
+              <div class="s5-card" onclick="applyExpulsionSwap('${expelledId}', '${p.id}')">
+                <div style="font-weight:900;color:var(--primary)">${p.number||'00'}</div>
+                <div style="font-size:11px">${p.name.split(' ')[0]}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    `);
+
+    window.applyExpulsionSwap = (oldId, newId) => {
+      liveStats[oldId].onCourt = false;
+      liveStats[newId].onCourt = true;
+      _closeModal();
+      refreshLiveUI();
+      showToast('Sustitución realizada tras expulsión ✓', 'success');
+      syncLiveToFirebase();
+    };
   };
 
   window.endGameConfirm = async () => {
@@ -1516,9 +1566,14 @@ async function renderGameRecap(container, { gameId }) {
   if (gameId === 'practice') {
     g = { ...window._practiceData, id: 'practice', teamId: (APP.userData.teamId || 't1') };
     team = { name: 'Simulacro' };
-    players = await db.collection('players').where('teamId', '==', g.teamId).get().then(s => s.docs.map(d => ({id:d.id,...d.data()})));
+    if (IS_DEMO_MODE) {
+      players = DEMO_DATA.players.filter(p => p.teamId === g.teamId);
+    } else {
+      players = await db.collection('players').where('teamId', '==', g.teamId).get().then(s => s.docs.map(d => ({id:d.id,...d.data()})));
+    }
   } else {
-    g = await db.collection('games').doc(gameId).get().then(d => ({id:d.id,...d.data()}));
+    const snap = await db.collection('games').doc(gameId).get();
+    g = { id: snap.id, ...snap.data() };
     team = await db.collection('teams').doc(g.teamId).get().then(d => d.data());
     players = await db.collection('players').where('teamId', '==', g.teamId).get().then(s => s.docs.map(d => ({id:d.id,...d.data()})));
   }
@@ -1547,6 +1602,45 @@ async function renderGameRecap(container, { gameId }) {
       </div>
     </div>` : ''}
 
+    <div style="padding:0 16px 24px">
+      <div class="section-title" style="margin-bottom:12px;font-size:14px">INDICADORES DE ÉXITO 🚀</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        ${(() => {
+          let tFGM=0, tFGA=0, t3PM=0, tPaint=0, tAst=0, sPts=0, bPts=0;
+          Object.keys(g.playerStats || {}).forEach(pid => {
+            const s = g.playerStats[pid];
+            const made = (s.pts_layup||0) + (s.pts_jump||0) + (s.pts_3||0);
+            const missed = (s.miss_2||0) + (s.miss_3||0);
+            tFGM += made; tFGA += (made + missed); t3PM += (s.pts_3||0);
+            tPaint += (s.pts_layup||0) * 2;
+            tAst += (s.ast||0);
+            if (s.isStarter) sPts += (s.pts||0); else bPts += (s.pts||0);
+          });
+          const eFG = tFGA > 0 ? Math.round(((tFGM + 0.5 * t3PM) / tFGA) * 100) : 0;
+          const astPct = tFGM > 0 ? Math.round((tAst / tFGM) * 100) : 0;
+
+          return `
+            <div class="stat-card" style="padding:16px;text-align:left;background:rgba(59,130,246,0.05);border:1px solid rgba(59,130,246,0.1)">
+              <div style="font-size:24px;font-weight:900;color:#60A5FA">${eFG}%</div>
+              <div style="font-size:10px;font-weight:800;opacity:0.6;margin-top:4px">EFECTIVIDAD REAL (eFG%)</div>
+            </div>
+            <div class="stat-card" style="padding:16px;text-align:left;background:rgba(34,197,94,0.05);border:1px solid rgba(34,197,94,0.1)">
+              <div style="font-size:24px;font-weight:900;color:#4CAF50">${tPaint}</div>
+              <div style="font-size:10px;font-weight:800;opacity:0.6;margin-top:4px">PUNTOS EN PINTURA</div>
+            </div>
+            <div class="stat-card" style="padding:16px;text-align:left;background:rgba(168,85,247,0.05);border:1px solid rgba(168,85,247,0.1)">
+              <div style="font-size:24px;font-weight:900;color:#A855F7">${astPct}%</div>
+              <div style="font-size:10px;font-weight:800;opacity:0.6;margin-top:4px">CANASTAS ASISTIDAS</div>
+            </div>
+            <div class="stat-card" style="padding:16px;text-align:left;background:rgba(255,107,44,0.05);border:1px solid rgba(255,107,44,0.1)">
+              <div style="font-size:24px;font-weight:900;color:var(--primary)">${bPts}</div>
+              <div style="font-size:10px;font-weight:800;opacity:0.6;margin-top:4px">PUNTOS DEL BANQUILLO</div>
+            </div>
+          `;
+        })()}
+      </div>
+    </div>
+
     <div style="padding:0 16px 32px">
       <div class="section-title" style="margin-bottom:16px;font-size:14px">MAPA DE TIRO DEL PARTIDO 🎯</div>
       <div style="background:#1E293B;border-radius:24px;border:1px solid var(--glass-border);position:relative;aspect-ratio:1.1;overflow:hidden">
@@ -1564,38 +1658,60 @@ async function renderGameRecap(container, { gameId }) {
 
     ${['admin','coach'].includes(APP.userData?.role) ? `
     <div style="padding:16px">
-      <div style="background:#0F172A;border:1px solid #1E293B;border-radius:24px;padding:20px">
+      <div style="background:#0F172A;border:1px solid #1E293B;border-radius:24px;padding:20px;overflow:hidden">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
           <div style="width:36px;height:36px;background:rgba(255,255,255,0.1);border-radius:10px;display:flex;align-items:center;justify-content:center">👨‍🏫</div>
-          <div style="font-size:14px;font-weight:900;color:white">ANÁLISIS TÉCNICO (PRIVADO)</div>
+          <div style="font-size:14px;font-weight:900;color:white">ANÁLISIS TÉCNICO DETALLADO</div>
         </div>
-        <div style="overflow-x:auto">
-          <table style="width:100%;font-size:11px;color:rgba(255,255,255,0.7);border-collapse:collapse;min-width:320px">
+        <div style="overflow-x:auto;margin:0 -20px;padding:0 20px">
+          <table style="width:100%;font-size:11px;color:rgba(255,255,255,0.7);border-collapse:collapse;min-width:500px">
             <thead>
-              <tr style="border-bottom:1px solid rgba(255,255,255,0.1);text-align:left">
-                <th style="padding:8px 4px">JUGADOR</th>
-                <th style="padding:8px 4px">MINS</th>
-                <th style="padding:8px 4px">% FG</th>
-                <th style="padding:8px 4px">TO</th>
-                <th style="padding:8px 4px">FC/FR</th>
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.1);text-align:left;color:var(--text-3)">
+                <th style="padding:10px 4px">JUGADORA</th>
+                <th style="padding:10px 4px">MIN</th>
+                <th style="padding:10px 4px">PTS</th>
+                <th style="padding:10px 4px">REB</th>
+                <th style="padding:10px 4px">AST</th>
+                <th style="padding:10px 4px">FAL</th>
+                <th style="padding:10px 4px;text-align:center">VAL</th>
+                <th style="padding:10px 4px;text-align:center">+/-</th>
               </tr>
             </thead>
             <tbody>
-              ${Object.keys(g.playerStats || {}).map(pid => {
-                 const s = g.playerStats[pid];
-                 const shotsMade = (s.pts_layup||0) + (s.pts_jump||0) + (s.pts_3||0);
-                 const attempts = shotsMade + (s.miss_2||0) + (s.miss_3||0);
-                 const pct = attempts > 0 ? Math.round((shotsMade/attempts)*100) : 0;
-                 const p = players.find(x => x.id === pid) || {name:'?'};
-                 return `
-                  <tr style="border-bottom:1px solid rgba(255,255,255,0.05)">
-                    <td style="padding:12px 4px;font-weight:700;color:white">${p.name.split(' ')[0]}</td>
-                    <td style="padding:12px 4px">${Math.floor((s.mins||0)/60)}m</td>
-                    <td style="padding:12px 4px;font-weight:800;color:${pct>50?'#4CAF50':(pct<30?'#FF4444':'white')}">${pct}%</td>
-                    <td style="padding:12px 4px">${s.to||0}</td>
-                    <td style="padding:12px 4px">${s.pf||0}/${s.f_drawn||0}</td>
+              ${(() => {
+                let tPts=0, tReb=0, tAst=0, tF=0, tVal=0, tMin=0;
+                const rows = Object.keys(g.playerStats || {}).map(pid => {
+                   const s = g.playerStats[pid];
+                   const p = players.find(x => x.id === pid) || {name:'?'};
+                   const val = calculateVal(s);
+                   const reb = (s.reb_off||0) + (s.reb_def||0);
+                   tPts += (s.pts||0); tReb += reb; tAst += (s.ast||0); tF += (s.pf||0); tVal += val; tMin += (s.mins||0);
+                   
+                   return `
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05)">
+                      <td style="padding:14px 4px;font-weight:700;color:white">${p.name.split(' ')[0]}</td>
+                      <td style="padding:14px 4px;opacity:0.6">${Math.floor((s.mins||0)/60)}'</td>
+                      <td style="padding:14px 4px;font-weight:900;color:var(--primary)">${s.pts||0}</td>
+                      <td style="padding:14px 4px">${reb}</td>
+                      <td style="padding:14px 4px">${s.ast||0}</td>
+                      <td style="padding:14px 4px">${s.pf||0}</td>
+                      <td style="padding:14px 4px;text-align:center;font-weight:900;color:${val>15?'#4CAF50':'white'}">${val}</td>
+                      <td style="padding:14px 4px;text-align:center;font-weight:700;color:${s.plusMinus>0?'#4CAF50':(s.plusMinus<0?'#FF4444':'white')}">${s.plusMinus>0?'+':''}${s.plusMinus}</td>
+                    </tr>`;
+                }).join('');
+                
+                return rows + `
+                  <tr style="background:rgba(255,255,255,0.03);font-weight:900;color:white">
+                    <td style="padding:14px 4px">TOTAL EQUIPO</td>
+                    <td style="padding:14px 4px">${Math.floor(tMin/60)}'</td>
+                    <td style="padding:14px 4px;color:var(--primary)">${tPts}</td>
+                    <td style="padding:14px 4px">${tReb}</td>
+                    <td style="padding:14px 4px">${tAst}</td>
+                    <td style="padding:14px 4px">${tF}</td>
+                    <td style="padding:14px 4px;text-align:center">${tVal}</td>
+                    <td style="padding:14px 4px;text-align:center">-</td>
                   </tr>`;
-              }).join('')}
+              })()}
             </tbody>
           </table>
         </div>
