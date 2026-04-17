@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function setupShell() {
   document.getElementById('headerSubtitle').textContent = roleLabel();
   const r = APP.userData?.role || APP.userData?.rol;
-  if (r === 'admin' || r === 'coach') {
+  if (r === 'admin' || r === 'coach' || r === 'gestor') {
     document.getElementById('nav-admin').style.display = '';
   }
   refreshBadge();
@@ -115,7 +115,7 @@ function setupShell() {
 
 function roleLabel() {
   const r = APP.userData?.role || APP.userData?.rol;
-  return { admin:'Administrador del Club', coach:'Entrenador/a', parent:'Familia', player:'Jugador/a' }[r] || 'Usuario';
+  return { admin:'Administrador del Club', gestor:'Gestor de Club', coach:'Entrenador/a', parent:'Familia', player:'Jugador/a' }[r] || 'Usuario';
 }
 
 function refreshBadge() {
@@ -175,6 +175,7 @@ function navigateTo(view, params = {}, addHistory = true) {
     'admin-permissions':  renderAdminPermissions,
     'admin-news':         renderAdminNews,
     'admin-practice':     renderAdminPractice,
+    'admin-approvals':    renderAdminApprovals,
     'game-live-view':     renderGameLiveViewOnly,
     'game-recap':         renderGameRecap
   };
@@ -1370,9 +1371,9 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
     });
 
     if (window._isPractice) {
+       window._practiceData = { playerStats: playersStatsUpdates.reduce((acc,p)=>{acc[p.id]=p.stats; return acc;}, {}), mvp, homeScore: hs, awayScore: as_ };
        showToast('Simulacro finalizado. Datos no guardados en el club.','info');
        navigateTo('game-recap', { gameId: 'practice' }); 
-       window._practiceData = { playerStats: playersStatsUpdates.reduce((acc,p)=>{acc[p.id]=p.stats; return acc;}, {}), mvp, homeScore: hs, awayScore: as_ };
        return;
     }
 
@@ -1872,10 +1873,11 @@ async function renderAdmin(container) {
     </div>
 
     <div class="admin-quick-grid">
-      ${isAdmin ? `<div class="admin-quick-btn" onclick="navigateTo('admin-users')"><div class="admin-quick-icon">👥</div><div class="admin-quick-label">Gestión de Usuarios</div></div>` : ''}
+      ${(isAdmin || APP.userData.role === 'gestor') ? `<div class="admin-quick-btn" onclick="navigateTo('admin-users')"><div class="admin-quick-icon">👥</div><div class="admin-quick-label">Gestión de Usuarios</div></div>` : ''}
       <div class="admin-quick-btn" onclick="navigateTo('admin-teams')"><div class="admin-quick-icon">🏀</div><div class="admin-quick-label">Equipos y Jugadores</div></div>
       <div class="admin-quick-btn" onclick="navigateTo('admin-compose')"><div class="admin-quick-icon">✉️</div><div class="admin-quick-label">Enviar Mensaje</div></div>
       <div class="admin-quick-btn" onclick="navigateTo('admin-news')"><div class="admin-quick-icon">📰</div><div class="admin-quick-label">Publicar Noticia</div></div>
+      ${isAdmin ? `<div class="admin-quick-btn" onclick="navigateTo('admin-approvals')"><div class="admin-quick-icon" style="position:relative">📑<div id="approvalsBadge" style="display:none;position:absolute;top:-5px;right:-5px;background:var(--danger);color:white;font-size:10px;padding:2px 6px;border-radius:10px">0</div></div><div class="admin-quick-label">Aprobaciones Pendientes</div></div>` : ''}
       ${isAdmin ? `<div class="admin-quick-btn" onclick="navigateTo('admin-permissions')"><div class="admin-quick-icon">🔐</div><div class="admin-quick-label">Control de Visibilidad</div></div>` : ''}
       <div class="admin-quick-btn" onclick="exportStats()"><div class="admin-quick-icon">📊</div><div class="admin-quick-label">Exportar Estadísticas</div></div>
     </div>
@@ -2097,6 +2099,22 @@ function roleLabelRaw(r) {
       if (pPhone.length !== 9) { showToast('El teléfono del tutor debe tener 9 números','error'); return; }
     }
 
+    if (APP.userData.role === 'gestor') {
+       const proposal = {
+          type: 'CREATE',
+          targetCollection: 'users',
+          name: name,
+          data: { name, birthDate:birth, phone, photo, guardian: age<18?guardian:null, parentPhone: age<18?pPhone:null, email, role, teamId:teamId||null, pass, pNum, pPos },
+          requestedBy: APP.userData.name,
+          requestedById: APP.userData.id,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp()
+       };
+       await db.collection('pending_approvals').add(proposal);
+       _closeModal();
+       showToast('Solicitud de creación enviada al Administrador','info');
+       return;
+    }
+
     if (!IS_DEMO_MODE) {
       try {
         const sec  = firebase.initializeApp(FIREBASE_CONFIG, `sec_${Date.now()}`);
@@ -2238,6 +2256,25 @@ function roleLabelRaw(r) {
     };
     if (photo) data.photo = photo;
 
+    if (APP.userData.role === 'gestor') {
+       const oldData = (await db.collection('users').doc(userId).get()).data();
+       const proposal = {
+          type: 'UPDATE',
+          targetCollection: 'users',
+          targetId: userId,
+          name: name,
+          newData: data,
+          oldData: oldData,
+          requestedBy: APP.userData.name,
+          requestedById: APP.userData.id,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp()
+       };
+       await db.collection('pending_approvals').add(proposal);
+       _closeModal();
+       showToast('Solicitud de modificación enviada al Administrador','info');
+       return;
+    }
+
     if (!IS_DEMO_MODE) {
       await db.collection('users').doc(userId).update(data);
       const psnap = await db.collection('players').where('uid','==',userId).get();
@@ -2260,6 +2297,24 @@ function roleLabelRaw(r) {
 
   window.deleteUser = async (userId) => {
     if (!confirm('¿Estás COMPLETAMENTE SEGURO de querer eliminar este usuario? Perderá el acceso y se borrará su ficha de jugador para siempre.')) return;
+    
+    if (APP.userData.role === 'gestor') {
+       const u = (await db.collection('users').doc(userId).get()).data();
+       const proposal = {
+          type: 'DELETE',
+          targetCollection: 'users',
+          targetId: userId,
+          name: u.name,
+          requestedBy: APP.userData.name,
+          requestedById: APP.userData.id,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp()
+       };
+       await db.collection('pending_approvals').add(proposal);
+       _closeModal();
+       showToast('Solicitud de eliminación enviada al Administrador','info');
+       return;
+    }
+
     if (!IS_DEMO_MODE) {
       await db.collection('users').doc(userId).delete();
       const psnap = await db.collection('players').where('uid','==',userId).get();
@@ -2719,5 +2774,107 @@ async function renderAdminPractice(container) {
 
   window.startPractice = (teamId, teamName) => {
     navigateTo('game-live', { teamId, teamName, gameId: 'practice', isPractice: true });
+  };
+}
+
+// ===================== VIEW: ADMIN APPROVALS =====================
+async function renderAdminApprovals(container) {
+  container.innerHTML = `<button class="back-btn" onclick="goBack()">‹ Panel Admin</button><div class="loader"><div class="spinner"></div></div>`;
+  const snap = await db.collection('pending_approvals').orderBy('timestamp','desc').get();
+  const reqs = snap.docs.map(d => ({id:d.id, ...d.data()}));
+
+  container.innerHTML = `
+    <button class="back-btn" onclick="goBack()">‹ Panel Admin</button>
+    <div class="section-header">
+      <div><div class="section-title">Aprobaciones</div><div class="section-subtitle">Peticiones de Gestores</div></div>
+    </div>
+    <div id="approvalsList" style="padding:0 16px 80px">
+      ${reqs.length ? reqs.map(r => `
+        <div class="card" style="margin-bottom:16px;border:1px solid rgba(255,255,255,0.05);position:relative">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <span style="font-size:10px;font-weight:900;color:var(--primary);letter-spacing:1px;background:rgba(255,107,44,0.1);padding:4px 8px;border-radius:6px">${r.type}</span>
+            <span style="font-size:10px;opacity:0.5">${r.timestamp?.toDate().toLocaleString() || ''}</span>
+          </div>
+          <div style="font-size:14px;font-weight:800;margin-bottom:8px">${r.name}</div>
+          <div style="font-size:11px;opacity:0.6;margin-bottom:12px">Solicitado por: <b>${r.requestedBy}</b></div>
+          
+          <div style="background:var(--bg-dark);padding:12px;border-radius:12px;font-family:monospace;font-size:11px;border:1px solid rgba(255,255,255,0.05);margin-bottom:16px;max-height:200px;overflow-y:auto">
+            ${renderDiffLocal(r)}
+          </div>
+
+          <div style="display:flex;gap:10px">
+            <button class="btn-full btn-ghost-full" style="flex:1" onclick="rejectApproval('${r.id}')">Rechazar</button>
+            <button class="btn-full btn-primary-full" style="flex:1;background:#22c55e" onclick="approveRequest('${r.id}')">Aprobar</button>
+          </div>
+        </div>
+      `).join('') : '<div class="empty-state">No hay solicitudes pendientes</div>'}
+    </div>`;
+
+  function renderDiffLocal(r) {
+    if (r.type === 'CREATE') return `<div style="color:#22c55e">✓ Nuevo usuario: ${r.data.email}<br>✓ Rol: ${r.data.role}</div>`;
+    if (r.type === 'DELETE') return `<div style="color:var(--danger)">⚠️ ELIMINAR CUENTA COMPLETAMENTE</div>`;
+    
+    return Object.keys(r.newData).map(k => {
+      if (JSON.stringify(r.newData[k]) !== JSON.stringify(r.oldData[k])) {
+        return `<div style="margin-bottom:6px"><b>${k.toUpperCase()}:</b><br><span style="text-decoration:line-through;color:var(--danger)">${r.oldData[k] || '(vacío)'}</span><br><span style="color:#22c55e">${r.newData[k]}</span></div>`;
+      }
+      return '';
+    }).join('');
+  }
+
+  window.rejectApproval = async (id) => {
+    if (!confirm('¿Rechazar esta solicitud? Se eliminará de la lista.')) return;
+    await db.collection('pending_approvals').doc(id).delete();
+    renderAdminApprovals(container);
+    showToast('Solicitud rechazada y eliminada','info');
+  };
+
+  window.approveRequest = async (id) => {
+    const r = (await db.collection('pending_approvals').doc(id).get()).data();
+    showToast('Procesando aprobación...', 'info');
+
+    try {
+      if (r.type === 'CREATE') {
+        const d = r.data;
+        const sec = firebase.initializeApp(FIREBASE_CONFIG, `approve_${Date.now()}`);
+        const nu = await sec.auth().createUserWithEmailAndPassword(d.email, d.pass);
+        const uid = nu.user.uid;
+
+        await db.collection('users').doc(uid).set({ 
+          name:d.name, birthDate:d.birthDate, phone:d.phone, photo:d.photo, guardian:d.guardian, parentPhone:d.parentPhone,
+          email:d.email, role:d.role, teamId:d.teamId, active:true, createdAt:firebase.firestore.FieldValue.serverTimestamp() 
+        });
+
+        if (d.role === 'player' && d.teamId) {
+          await db.collection('players').add({
+            uid, photo:d.photo, name:d.name, age:calcAge(d.birthDate), number:parseInt(d.pNum), position:d.pPos, teamId:d.teamId,
+            guardian:d.guardian, parentPhone:d.parentPhone, active:true, stats:{pts:0,reb:0,ast:0,stl:0,blk:0,to:0,pf:0,reb_off:0,reb_def:0},
+            createdAt:firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }
+        await sec.auth().signOut();
+        await sec.delete();
+      } 
+      else if (r.type === 'UPDATE') {
+        await db.collection('users').doc(r.targetId).update(r.newData);
+        const psnap = await db.collection('players').where('uid','==',r.targetId).get();
+        psnap.forEach(d => {
+          const up = { name:r.newData.name, teamId:r.newData.teamId, birth:r.newData.birth, guardian:r.newData.guardian, parentPhone:r.newData.parentPhone };
+          if (r.newData.photo) up.photo = r.newData.photo;
+          d.ref.update(up);
+        });
+      }
+      else if (r.type === 'DELETE') {
+        await db.collection('users').doc(r.targetId).delete();
+        const psnap = await db.collection('players').where('uid','==',r.targetId).get();
+        psnap.forEach(d => d.ref.delete());
+      }
+
+      await db.collection('pending_approvals').doc(id).delete();
+      showToast('¡Solicitud aprobada y ejecutada!','success');
+      renderAdminApprovals(container);
+    } catch(e) {
+      showToast('Error al aprobar: ' + e.message, 'error');
+    }
   };
 }
