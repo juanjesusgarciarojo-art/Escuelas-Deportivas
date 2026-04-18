@@ -425,97 +425,100 @@ async function renderHome(container) {
   const isAdmin   = ['admin','coach'].includes(APP.userData.role);
 
   container.innerHTML = `
-    ${IS_DEMO_MODE ? `
-    <div style="margin:12px 16px 0;padding:10px 14px;background:rgba(255,184,0,0.08);border:1px solid rgba(255,184,0,0.25);border-radius:12px;display:flex;align-items:center;gap:10px">
-      <span style="font-size:18px">⚠️</span>
-      <div>
-        <div style="font-size:12px;font-weight:700;color:#FFB800">Modo demostración activo</div>
-        <div style="font-size:11px;color:var(--text-2)">Configura Firebase para datos reales</div>
+    const isStaff = ['admin','coach'].includes(APP.userData.role);
+    const canSeeNews = isStaff || APP.permissions.show_news;
+    const canSeeScores = isStaff || APP.permissions.show_scores;
+    const canSeeCalendar = isStaff || APP.permissions.show_calendar;
+
+    container.innerHTML = `
+      ${IS_DEMO_MODE ? `
+      <div style="margin:12px 16px 0;padding:10px 14px;background:rgba(255,184,0,0.08);border:1px solid rgba(255,184,0,0.25);border-radius:12px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:18px">⚠️</span>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#FFB800">Modo demostración activo</div>
+          <div style="font-size:11px;color:var(--text-2)">Configura Firebase para datos reales</div>
+        </div>
+      </div>` : ''}
+
+      <div class="section-header">
+        <div>
+          <div class="section-title">¡Hola, ${APP.userData.name.split(' ')[0]}! 👋</div>
+          <div class="section-subtitle">${roleLabel()}</div>
+        </div>
       </div>
-    </div>` : ''}
 
-    <div class="section-header">
-      <div>
-        <div class="section-title">¡Hola, ${APP.userData.name.split(' ')[0]}! 👋</div>
-        <div class="section-subtitle">${roleLabel()}</div>
+      <!-- Hero Banner -->
+      <div class="hero-banner">
+        <div class="hero-title">Club Baloncesto<br>Gallardas 🏀</div>
+        <div class="hero-sub" style="margin-top:8px">${teams.length} equipos activos · Temporada 2024-25</div>
       </div>
-    </div>
 
-    <!-- Live Games Alert -->
-    ... (rest of codes) ...
+      <!-- Noticias del Club -->
+      ${(canSeeNews && news.length) ? `
+      <div class="section-header">
+        <div class="section-title" style="font-size:18px">Noticias del Club</div>
+        ${isAdmin ? `<button class="section-action" onclick="navigateTo('admin-news')">+ Nueva</button>` : ''}
+      </div>
+      <div class="news-container">
+        ${news.slice(0,3).map((n, i) => i === 0 ? `
+          <div class="news-card featured" onclick="showNewsDetail('${n.id}')">
+            <div class="news-badge">${n.category}</div>
+            <div class="news-img-hero">${n.photo ? `<img src="${n.photo}">` : '📰'}</div>
+            <div class="news-content">
+              <div class="news-date">${fmtDate(n.date)}</div>
+              <div class="news-title-hero">${n.title}</div>
+              <div class="news-preview-hero">${n.body.substring(0,80)}...</div>
+            </div>
+          </div>
+        ` : newsCardHTML(n)).join('')}
+      </div>` : (canSeeNews ? `
+      <div class="section-header">
+        <div class="section-title" style="font-size:18px">Noticias del Club</div>
+        ${isAdmin ? `<button class="section-action" onclick="navigateTo('admin-news')">+ Nueva</button>` : ''}
+      </div>
+      <div class="empty-state">No hay noticias publicadas recientemente</div>` : '')}
 
-    <!-- Hero Banner -->
-    <div class="hero-banner">
-      <div class="hero-title">Club Baloncesto<br>Gallardas 🏀</div>
-      <div class="hero-sub" style="margin-top:8px">${teams.length} equipos activos · Temporada 2024-25</div>
-    </div>
-
-    <!-- Noticias del Club (Prioridad Global) -->
-    ${news.length ? `
-    <div class="section-header">
-      <div class="section-title" style="font-size:18px">Noticias del Club</div>
-      ${isAdmin ? `<button class="section-action" onclick="navigateTo('admin-news')">+ Nueva</button>` : ''}
-    </div>
-    <div class="news-container">
-      ${news.slice(0,3).map((n, i) => i === 0 ? `
-        <div class="news-card featured" onclick="showNewsDetail('${n.id}')">
-          <div class="news-badge">${n.category}</div>
-          <div class="news-img-hero">${n.photo ? `<img src="${n.photo}">` : '📰'}</div>
-          <div class="news-content">
-            <div class="news-date">${fmtDate(n.date)}</div>
-            <div class="news-title-hero">${n.title}</div>
-            <div class="news-preview-hero">${n.body.substring(0,80)}...</div>
+      <!-- Live Games Alert (Siempre para Admin, restringido por canSeeScores para otros) -->
+      ${games.filter(g => g.status === 'live').filter(g => isStaff || canSeeScores).map(lg => `
+      <div class="live-game-banner" onclick="navigateTo('game-live-view', { gameId:'${lg.id}', teamName:'${lg.teamName||'Gallardas'}' })">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div class="live-badge"><div class="live-dot"></div>&nbsp;PARTIDO EN DIRECTO</div>
+          <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.6)">${lg.quarter === 'PR' ? 'PRORROGA' : 'CUARTO ' + lg.quarter}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px">
+          <div style="text-align:right">
+            <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-bottom:2px">${lg.teamName||'Gallardas'}</div>
+            <div style="font-size:28px;font-weight:900;line-height:1">${lg.homeScore||0}</div>
+          </div>
+          <div style="font-size:18px;opacity:0.3">VS</div>
+          <div style="text-align:left">
+            <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-bottom:2px">Rival</div>
+            <div style="font-size:28px;font-weight:900;line-height:1">${lg.awayScore||0}</div>
           </div>
         </div>
-      ` : newsCardHTML(n)).join('')}
-    </div>` : `
-    <div class="section-header">
-      <div class="section-title" style="font-size:18px">Noticias del Club</div>
-      ${isAdmin ? `<button class="section-action" onclick="navigateTo('admin-news')">+ Nueva</button>` : ''}
-    </div>
-    <div class="empty-state">No hay noticias publicadas recientemente</div>`}
+      </div>`).join('')}
 
-    <!-- Live Games Alert -->
-    ${games.filter(g => g.status === 'live').map(lg => `
-    <div class="live-game-banner" onclick="navigateTo('game-live-view', { gameId:'${lg.id}', teamName:'${lg.teamName||'Gallardas'}' })">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div class="live-badge"><div class="live-dot"></div>&nbsp;PARTIDO EN DIRECTO</div>
-        <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.6)">${lg.quarter === 'PR' ? 'PRORROGA' : 'CUARTO ' + lg.quarter}</div>
+      <!-- Competición -->
+      ${(canSeeCalendar && upcoming.length) ? `
+      <div class="section-header" style="margin-top:24px">
+        <div class="section-title" style="font-size:18px">Próximos partidos</div>
+        <button class="section-action" onclick="navigateTo('games')">Ver todos</button>
       </div>
-      <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px">
-        <div style="text-align:right">
-          <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-bottom:2px">${lg.teamName||'Gallardas'}</div>
-          <div style="font-size:28px;font-weight:900;line-height:1">${lg.homeScore||0}</div>
-        </div>
-        <div style="font-size:18px;opacity:0.3">VS</div>
-        <div style="text-align:left">
-          <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-bottom:2px">Rival</div>
-          <div style="font-size:28px;font-weight:900;line-height:1">${lg.awayScore||0}</div>
-        </div>
-      </div>
-      <div style="margin-top:12px;display:flex;justify-content:center">
-        <button class="btn-live-join">Ver marcador en vivo ›</button>
-      </div>
-    </div>`).join('')}
+      <div class="games-list-home">
+        ${upcoming.slice(0,2).map(gameCardHTML).join('')}
+      </div>` : ''}
 
-    <!-- Competición -->
-    ${upcoming.length ? `
-    <div class="section-header" style="margin-top:24px">
-      <div class="section-title" style="font-size:18px">Próximos partidos</div>
-      <button class="section-action" onclick="navigateTo('games')">Ver todos</button>
-    </div>
-    <div class="games-list-home">
-      ${upcoming.slice(0,2).map(gameCardHTML).join('')}
-    </div>` : ''}
+      <!-- Resultados -->
+      ${(canSeeScores && finished.length) ? `
+      <div class="section-header" style="margin-top:20px">
+        <div class="section-title" style="font-size:18px">Últimos resultados</div>
+        <button class="section-action" onclick="navigateTo('games')">Ver todos</button>
+      </div>
+      <div class="results-list-home">
+        ${finished.slice(0,2).map(gameCardHTML).join('')}
+      </div>` : ''}
 
-    ${finished.length ? `
-    <div class="section-header" style="margin-top:20px">
-      <div class="section-title" style="font-size:18px">Últimos resultados</div>
-      <button class="section-action" onclick="navigateTo('games')">Ver todos</button>
-    </div>
-    <div class="results-list-home">
-      ${finished.slice(0,2).map(gameCardHTML).join('')}
-    </div>` : ''}
+      <div style="height:16px"></div>`;
 
     <div style="height:16px"></div>`;
 }
@@ -591,6 +594,10 @@ async function renderTeamDetail(container, { teamId }) {
   const canManage = ['admin','coach'].includes(APP.userData.role);
   const emoji    = team?.gender === 'Femenino' ? '👧' : '👦';
 
+  const isStaff = ['admin','coach'].includes(APP.userData.role);
+  const canSeeRoster = isStaff || APP.permissions.show_roster;
+  const canSeeStats = isStaff || APP.permissions.show_team_stats;
+
   container.innerHTML = `
     <button class="back-btn" onclick="goBack()">‹ Equipos</button>
 
@@ -611,13 +618,13 @@ async function renderTeamDetail(container, { teamId }) {
     </div>
 
     <div class="tab-pills">
-      <button class="tab-pill active" onclick="teamTab('players',this)">Plantilla (${players.length})</button>
-      <button class="tab-pill" onclick="teamTab('stats',this)">Estadísticas</button>
-      <button class="tab-pill" onclick="teamTab('games',this)">Partidos (${games.length})</button>
+      ${canSeeRoster ? `<button class="tab-pill active" onclick="teamTab('players',this)">Plantilla (${players.length})</button>` : ''}
+      ${canSeeStats ? `<button class="tab-pill ${!canSeeRoster ? 'active':''}" onclick="teamTab('stats',this)">Estadísticas</button>` : ''}
+      <button class="tab-pill ${(!canSeeRoster && !canSeeStats) ? 'active':''}" onclick="teamTab('games',this)">Partidos (${games.length})</button>
     </div>
 
     <!-- PLAYERS TAB -->
-    <div id="tdtab-players">
+    <div id="tdtab-players" style="${!canSeeRoster ? 'display:none' : ''}">
       <div class="card">
         <div class="card-header">
           <div class="card-title">Plantilla</div>
@@ -643,7 +650,7 @@ async function renderTeamDetail(container, { teamId }) {
     </div>
 
     <!-- STATS TAB -->
-    <div id="tdtab-stats" style="display:none">
+    <div id="tdtab-stats" style="${(!canSeeStats || !canSeeRoster) ? 'display:none' : ''}">
       ${!players.length
           ? `<div class="empty-state"><div class="empty-icon">📊</div><div class="empty-title">Sin estadísticas</div></div>`
           : [['pts','🏀 Anotación'],['reb','📊 Rebotes'],['ast','🎯 Asistencias'],['stl','🔒 Robos'],['blk','🛡️ Tapones']].map(([s,t]) => leaderboardHTML(players,s,t)).join('')}
@@ -681,7 +688,8 @@ async function renderPlayerDetail(container, { playerId, teamId }) {
   if (!p) { container.innerHTML = `<div class="back-btn" onclick="goBack()">‹ Atrás</div><div class="empty-state"><div class="empty-icon">🤷</div><div class="empty-title">Jugador no encontrado</div></div>`; return; }
 
   const eff = (p.stats?.pts||0)+(p.stats?.reb||0)+(p.stats?.ast||0)+(p.stats?.stl||0)+(p.stats?.blk||0)-(p.stats?.to||0);
-  const canSeeStats = APP.permissions.show_individual_stats;
+  const isStaff = ['admin','coach'].includes(APP.userData.role);
+  const canSeeStats = isStaff || APP.permissions.show_individual_stats;
 
   container.innerHTML = `
     <button class="back-btn" onclick="goBack()">‹ Equipo</button>
@@ -2478,17 +2486,27 @@ function roleLabelRaw(r) {
     if (!IS_DEMO_MODE) {
       await db.collection('users').doc(userId).update(data);
       const psnap = await db.collection('players').where('uid','==',userId).get();
-      psnap.forEach(d => {
-        const updateObj = { 
-          name: data.name, 
-          teamId: data.teamId,
-          birth: data.birth,
-          guardian: data.guardian,
-          parentPhone: data.parentPhone
-        };
-        if (data.photo) updateObj.photo = data.photo;
-        d.ref.update(updateObj);
-      });
+      if (!psnap.empty) {
+        psnap.forEach(d => {
+          const updateObj = { 
+            name: data.name, 
+            teamId: data.teamId,
+            birth: data.birth,
+            guardian: data.guardian,
+            parentPhone: data.parentPhone
+          };
+          if (data.photo) updateObj.photo = data.photo;
+          d.ref.update(updateObj);
+        });
+      } else if (data.role === 'player' && data.teamId) {
+        await db.collection('players').add({
+          uid: userId, photo: data.photo || null,
+          name: data.name, age: calcAge(data.birth), number: 0, position: 'Sin definir', teamId: data.teamId,
+          guardian: data.guardian, parentPhone: data.parentPhone, active: true,
+          stats: { pts:0, reb:0, ast:0, stl:0, blk:0, to:0, pf:0, reb_off:0, reb_def:0 },
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
     }
     _closeModal();
     showToast('Usuario actualizado ✓','success');
@@ -3058,11 +3076,21 @@ async function renderAdminApprovals(container) {
       else if (r.type === 'UPDATE') {
         await db.collection('users').doc(r.targetId).update(r.newData);
         const psnap = await db.collection('players').where('uid','==',r.targetId).get();
-        psnap.forEach(d => {
-          const up = { name:r.newData.name, teamId:r.newData.teamId, birth:r.newData.birth, guardian:r.newData.guardian, parentPhone:r.newData.parentPhone };
-          if (r.newData.photo) up.photo = r.newData.photo;
-          d.ref.update(up);
-        });
+        if (!psnap.empty) {
+          psnap.forEach(d => {
+            const up = { name:r.newData.name, teamId:r.newData.teamId, birth:r.newData.birth, guardian:r.newData.guardian, parentPhone:r.newData.parentPhone };
+            if (r.newData.photo) up.photo = r.newData.photo;
+            d.ref.update(up);
+          });
+        } else if (r.newData.role === 'player' && r.newData.teamId) {
+          await db.collection('players').add({
+            uid: r.targetId, photo: r.newData.photo || null,
+            name: r.newData.name, age: calcAge(r.newData.birth), number: 0, position: 'Sin definir', teamId: r.newData.teamId,
+            guardian: r.newData.guardian, parentPhone: r.newData.parentPhone, active: true,
+            stats: { pts:0, reb:0, ast:0, stl:0, blk:0, to:0, pf:0, reb_off:0, reb_def:0 },
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }
       }
       else if (r.type === 'DELETE') {
         await db.collection('users').doc(r.targetId).delete();
