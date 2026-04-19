@@ -2507,6 +2507,18 @@ function roleLabelRaw(r) {
             <input class="form-input" id="euBirth" type="date" value="${u.birth||''}" onchange="checkEditUserMinor(this.value)">
           </div>
           <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label">CORREO ELECTRÓNICO</label>
+            <input class="form-input" id="euEmail" type="email" value="${u.email||''}" placeholder="correo@ejemplo.com">
+          </div>
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label">CONTRASEÑA (Dejar en blanco para mantener)</label>
+            <div style="display:flex;gap:8px">
+              <input class="form-input" id="euPass" type="text" placeholder="Nueva contraseña..." style="flex:1">
+              <button onclick="document.getElementById('euPass').value = genPassword()" style="flex-shrink:0;background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:0 14px;color:var(--text-1);font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font)">Generar</button>
+            </div>
+          </div>
+          
+          <div class="form-group" style="margin-bottom:12px">
             <label class="form-label">TELÉFONO DE CONTACTO</label>
             <input class="form-input" id="euPhone" type="tel" value="${u.phone||''}" maxlength="9" oninput="validatePhone(this)">
           </div>
@@ -2561,12 +2573,15 @@ function roleLabelRaw(r) {
     const name     = document.getElementById('euName').value.trim();
     const birth    = document.getElementById('euBirth').value;
     const phone    = document.getElementById('euPhone').value.trim();
+    const email    = document.getElementById('euEmail').value.trim();
+    const newPass  = document.getElementById('euPass').value.trim();
     const role     = document.getElementById('euRole').value;
     const teamId   = document.getElementById('euTeam').value || null;
     const guardian = document.getElementById('euGuardian').value.trim();
     const pPhone   = document.getElementById('euParentPhone').value.trim();
 
     if (phone.length !== 9) { showToast('El teléfono debe tener 9 números','error'); return; }
+    if (!email.includes('@')) { showToast('Introduce un correo electrónico válido','error'); return; }
     
     const age = calcAge(birth);
     if (age < 18) {
@@ -2575,11 +2590,12 @@ function roleLabelRaw(r) {
     }
 
     const data = { 
-      name, birth, phone, role, teamId,
+      name, birth, phone, role, teamId, email,
       guardian: age < 18 ? guardian : null,
       parentPhone: age < 18 ? pPhone : null
     };
     if (photo) data.photo = photo;
+    if (newPass) data.requestedPassword = newPass;
 
     if (APP.userData.role === 'gestor') {
        const oldData = (await db.collection('users').doc(userId).get()).data();
