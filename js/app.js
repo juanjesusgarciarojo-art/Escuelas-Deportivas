@@ -2259,7 +2259,7 @@ async function renderAdminUsers(container) {
             <div class="player-name">${u.name}</div>
             <div class="player-meta">${roleLabelRaw(u.role||u.rol)} ${u.teamName ? '· '+u.teamName : ''}</div>
           </div>
-          <button style="background:none;border:none;color:var(--text-3);font-size:20px;cursor:pointer;padding:8px" onclick="editUser('${u.name}')">•••</button>
+          <button style="background:none;border:none;color:var(--text-3);font-size:20px;cursor:pointer;padding:8px;z-index:99" onclick="editUser('${u.id}')">•••</button>
         </div>`).join('') : '<div class="empty-state">Sin usuarios</div>'}
     </div>
     <div style="padding:16px">
