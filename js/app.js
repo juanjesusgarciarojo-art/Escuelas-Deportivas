@@ -371,13 +371,21 @@ function gameCardHTML(g) {
 }
 
 function newsCardHTML(n) {
+  const isOwner = APP.userData?.role === 'admin' || (APP.userData?.role === 'coach' && n.authorId === APP.userData?.id);
+  const actionsHtml = isOwner ? `
+    <div style="display:flex;gap:6px;margin-top:8px" onclick="event.stopPropagation()">
+      <button class="btn-full btn-ghost-full" style="flex:1;font-size:11px;padding:6px" onclick="editContent('news','${n.id}', \`${n.body.replace(/`/g, '')}\`)">📝 Editar</button>
+      <button class="btn-full" style="flex:1;background:rgba(220,38,38,0.1);color:#ef4444;border:none;font-size:11px;padding:6px;border-radius:12px;font-weight:700" onclick="deleteNews('${n.id}','${n.title}')">🗑️ Borrar</button>
+    </div>
+  ` : '';
   return `
   <div class="news-card">
     <div class="news-img">${n.icon||'📰'}</div>
     <div class="news-content">
       <div class="news-date">${n.category} · ${fmtDate(n.date)}</div>
       <div class="news-title">${n.title}</div>
-      <div class="news-preview">${n.body.substring(0,110)}…</div>
+      <div class="news-preview" style="white-space:pre-wrap">${n.body}</div>
+      ${actionsHtml}
     </div>
   </div>`;
 }
@@ -460,17 +468,28 @@ async function renderHome(container) {
         ${isAdmin ? `<button class="section-action" onclick="navigateTo('admin-news')">+ Nueva</button>` : ''}
       </div>
       <div class="news-container">
-        ${news.slice(0,3).map((n, i) => i === 0 ? `
-          <div class="news-card featured" onclick="showNewsDetail('${n.id}')">
+        ${news.slice(0,3).map((n, i) => {
+          const isOwner = APP.userData?.role === 'admin' || (APP.userData?.role === 'coach' && n.authorId === APP.userData?.id);
+          const actionsHtml = isOwner ? `
+            <div style="display:flex;gap:6px;margin-top:12px" onclick="event.stopPropagation()">
+              <button class="btn-full" style="flex:1;background:rgba(0,0,0,0.5);color:#fff;padding:6px;backdrop-filter:blur(4px);border:none;border-radius:12px;font-size:11px" onclick="editContent('news','${n.id}', \`${n.body.replace(/`/g, '')}\`)">📝 Editar</button>
+              <button class="btn-full" style="flex:1;background:rgba(220,38,38,0.5);color:#fff;padding:6px;backdrop-filter:blur(4px);border:none;border-radius:12px;font-size:11px" onclick="deleteNews('${n.id}','${n.title}')">🗑️ Borrar</button>
+            </div>
+          ` : '';
+          
+          if (i === 0) return `
+          <div class="news-card featured">
             <div class="news-badge">${n.category}</div>
             <div class="news-img-hero">${n.photo ? `<img src="${n.photo}">` : '📰'}</div>
             <div class="news-content">
               <div class="news-date">${fmtDate(n.date)}</div>
               <div class="news-title-hero">${n.title}</div>
-              <div class="news-preview-hero">${n.body.substring(0,80)}...</div>
+              <div class="news-preview-hero" style="white-space:pre-wrap">${n.body}</div>
+              ${actionsHtml}
             </div>
           </div>
-        ` : newsCardHTML(n)).join('')}
+          `; else return newsCardHTML(n);
+        }).join('')}
       </div>` : (canSeeNews ? `
       <div class="section-header">
         <div class="section-title" style="font-size:18px">Noticias del Club</div>
@@ -831,38 +850,66 @@ async function renderGames(container) {
     });
   };
 
-  window.showNewGameModal = () => openModal(`
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div class="modal-title">Nuevo partido</div>
-      <div class="modal-body" style="padding-bottom:24px">
-        <div class="form-group" style="margin-bottom:12px">
-          <label class="form-label" style="font-size:11px">EQUIPO LOCAL</label>
-          <input class="form-input" id="ngHome" type="text" placeholder="Nombre equipo local" value="Gallardas">
+  window.showNewGameModal = async () => {
+    const teams = await getTeams();
+    openModal(`
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div class="modal-title">Nuevo partido</div>
+        <div class="modal-body" style="padding-bottom:24px">
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label" style="font-size:11px">NUESTRO EQUIPO</label>
+            <select class="form-input" id="ngTeamId">
+              ${teams.map(t => `<option value="${t.id}">${t.name} (${t.category})</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label" style="font-size:11px">RIVAL</label>
+            <input class="form-input" id="ngAway" type="text" placeholder="Nombre rival">
+          </div>
+          <div style="display:flex;gap:12px;margin-bottom:12px">
+            <div style="flex:1">
+              <label class="form-label" style="font-size:11px">¿JUGAMOS EN CASA?</label>
+              <select class="form-input" id="ngIsHome">
+                <option value="true">Sí (Local)</option>
+                <option value="false">No (Visitante)</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label" style="font-size:11px">FECHA Y HORA</label>
+            <input class="form-input" id="ngDate" type="datetime-local">
+          </div>
+          <div class="form-group" style="margin-bottom:20px">
+            <label class="form-label" style="font-size:11px">PABELLÓN / UBICACIÓN</label>
+            <input class="form-input" id="ngLocation" type="text" placeholder="Pabellón Municipal">
+          </div>
+          <button class="btn-full btn-primary-full" onclick="createGame()">Crear partido</button>
+          <button class="btn-full btn-ghost-full" style="margin-top:10px" onclick="_closeModal()">Cancelar</button>
         </div>
-        <div class="form-group" style="margin-bottom:12px">
-          <label class="form-label" style="font-size:11px">EQUIPO VISITANTE</label>
-          <input class="form-input" id="ngAway" type="text" placeholder="Nombre rival">
-        </div>
-        <div class="form-group" style="margin-bottom:12px">
-          <label class="form-label" style="font-size:11px">FECHA Y HORA</label>
-          <input class="form-input" id="ngDate" type="datetime-local">
-        </div>
-        <div class="form-group" style="margin-bottom:20px">
-          <label class="form-label" style="font-size:11px">PABELLÓN / UBICACIÓN</label>
-          <input class="form-input" id="ngLocation" type="text" placeholder="Pabellón Municipal">
-        </div>
-        <button class="btn-full btn-primary-full" onclick="createGame()">Crear partido</button>
-        <button class="btn-full btn-ghost-full" style="margin-top:10px" onclick="_closeModal()">Cancelar</button>
       </div>
-    </div>`);
+    `);
+  };
 
   window.createGame = async () => {
-    const data = { homeTeam: document.getElementById('ngHome').value.trim(), awayTeam: document.getElementById('ngAway').value.trim(), date: document.getElementById('ngDate').value, location: document.getElementById('ngLocation').value.trim(), status:'upcoming', homeScore:null, awayScore:null, isHome:true, createdBy: APP.userData.id };
-    if (!data.homeTeam || !data.awayTeam || !data.date) { showToast('Completa todos los campos','error'); return; }
+    const isHome = document.getElementById('ngIsHome').value === 'true';
+    const teamSel = document.getElementById('ngTeamId');
+    const teamName = teamSel.options[teamSel.selectedIndex]?.text || '';
+    const rival = document.getElementById('ngAway').value.trim();
+    const data = { 
+      teamId: teamSel.value, teamName: teamName, 
+      homeTeam: isHome ? teamName : rival, 
+      awayTeam: isHome ? rival : teamName, 
+      date: document.getElementById('ngDate').value, 
+      location: document.getElementById('ngLocation').value.trim(), 
+      status:'upcoming', homeScore:null, awayScore:null, isHome:isHome, createdBy: APP.userData.id,
+      attendance: {}
+    };
+    if (!rival || !data.date || !data.teamId) { showToast('Completa todos los campos','error'); return; }
     if (!IS_DEMO_MODE) await db.collection('games').add(data);
     _closeModal();
     showToast('Partido creado correctamente','success');
+    navigateTo('games');
   };
 }
 
@@ -875,7 +922,70 @@ async function renderGameDetail(container, { gameId }) {
   const fin     = g.status === 'finished';
   const win     = fin && isWin(g);
   const canEdit = ['admin','coach'].includes(APP.userData.role);
-  const players = IS_DEMO_MODE ? DEMO_DATA.players.filter(p => p.teamId === g.teamId) : [];
+  let players   = [];
+  if (IS_DEMO_MODE && g.teamId) {
+    players = DEMO_DATA.players.filter(p => p.teamId === g.teamId);
+  } else if (g.teamId) {
+    players = await getPlayers(g.teamId);
+  }
+
+  // RSVP Logic
+  const attendance = g.attendance || {};
+  let rsvpWidget = '';
+  if (!fin && g.teamId) {
+    if (APP.userData.role === 'player' || APP.userData.role === 'parent') {
+      const myPlayer = players.find(p => p.uid === (APP.userData.role === 'parent' ? APP.userData.id : APP.userData.id) || p.uid === APP.userData.id); 
+      // Si el equipo coincide y es player
+      if (myPlayer || (APP.userData.teamId === g.teamId && APP.userData.role==='player')) {
+        const actingPlayerId = myPlayer ? myPlayer.id : APP.userData.id;
+        const myStatus = attendance[actingPlayerId];
+        rsvpWidget = `
+          <div class="card" style="margin:0 16px 16px;padding:16px;background:var(--bg-card-2);display:flex;flex-direction:column;align-items:center;">
+            <div style="font-size:12px;font-weight:800;color:var(--text-3);margin-bottom:12px">CONFIRMAR ASISTENCIA</div>
+            <div style="display:flex;gap:10px;width:100%">
+              <button class="btn-full" style="flex:1;background:\${myStatus==='yes' ? '#10B981':'rgba(255,255,255,0.05)'};color:\${myStatus==='yes' ? '#fff':'var(--text-2)'};font-weight:\${myStatus==='yes'?'800':'500'}" onclick="setRSVP('${g.id}','${actingPlayerId}','yes')">✅ Sí voy</button>
+              <button class="btn-full" style="flex:1;background:\${myStatus==='no' ? '#EF4444':'rgba(255,255,255,0.05)'};color:\${myStatus==='no' ? '#fff':'var(--text-2)'};font-weight:\${myStatus==='no'?'800':'500'}" onclick="setRSVP('${g.id}','${actingPlayerId}','no')">❌ No asisto</button>
+            </div>
+            \${myStatus ? \`<div style="font-size:11px;color:var(--primary);margin-top:10px">✅ Respuesta guardada correctamente</div>\` : ''}
+          </div>
+        `;
+      }
+    } else if (['admin','coach'].includes(APP.userData.role)) {
+      const going = players.filter(p => attendance[p.id] === 'yes' || attendance[p.uid] === 'yes');
+      const notGoing = players.filter(p => attendance[p.id] === 'no' || attendance[p.uid] === 'no');
+      const unknown = players.filter(p => !attendance[p.id] && !attendance[p.uid]);
+      
+      rsvpWidget = `
+        <div class="card" style="margin:0 16px 16px;padding:16px">
+          <div style="font-size:13px;font-weight:800;margin-bottom:12px;display:flex;justify-content:space-between">
+            <span>📋 Asistencia de Jugadores</span>
+            <span style="color:var(--primary)">\${going.length} confirmados</span>
+          </div>
+          \${going.length > 0 ? \`
+            <div style="font-size:12px;color:#10B981;font-weight:700;margin-top:8px">✅ Van a asistir (\${going.length})</div>
+            <div style="font-size:13px;color:var(--text-2);margin-top:4px">\${going.map(p => p.name).join(' • ')}</div>
+          \` : ''}
+          \${notGoing.length > 0 ? \`
+            <div style="font-size:12px;color:#EF4444;font-weight:700;margin-top:12px">❌ Han rechazado (\${notGoing.length})</div>
+            <div style="font-size:13px;color:var(--text-2);margin-top:4px">\${notGoing.map(p => p.name).join(' • ')}</div>
+          \` : ''}
+          \${unknown.length > 0 ? \`
+            <div style="font-size:12px;color:var(--text-3);font-weight:700;margin-top:12px">⏳ Por responder (\${unknown.length})</div>
+            <div style="font-size:13px;color:var(--text-3);margin-top:4px">\${unknown.map(p => p.name).join(' • ')}</div>
+          \` : ''}
+        </div>
+      `;
+    }
+  }
+
+  window.setRSVP = async (gameId, playerId, status) => {
+    if (IS_DEMO_MODE) { showToast('Acción no disp. en Demo', 'info'); return; }
+    try {
+      await db.collection('games').doc(gameId).set({ attendance: { [playerId]: status } }, { merge:true });
+      showToast('Asistencia actualizada', 'success');
+      navigateTo('game-detail', { gameId });
+    } catch(e) { showToast('Error al confirmar','error'); }
+  };
 
   container.innerHTML = `
     <button class="back-btn" onclick="goBack()">‹ Partidos</button>
@@ -904,6 +1014,8 @@ async function renderGameDetail(container, { gameId }) {
       <span class="tag tag-gray">📅 ${fmtDate(g.date)}</span>
       ${g.teamName ? `<span class="tag tag-gray">👥 ${g.teamName}</span>` : ''}
     </div>
+
+    ${rsvpWidget}
 
     ${canEdit && !fin ? `
     <div style="padding:0 16px 16px">
@@ -968,7 +1080,7 @@ async function renderGameDetail(container, { gameId }) {
                const attempts = (s.pts_layup||0) + (s.pts_jump||0) + (s.miss_2||0) + (s.pts_3||0) + (s.miss_3||0);
                const made = (s.pts_layup||0) + (s.pts_jump||0) + (s.pts_3||0);
                const pct = attempts > 0 ? Math.round((made/attempts)*100) : 0;
-               const pName = team.players?.find(p => p.id === pid)?.name || 'Jugador';
+               const pName = players.find(p => p.id === pid)?.name || 'Jugador';
                return `
                 <tr style="border-bottom:1px solid rgba(255,255,255,0.05)">
                   <td style="padding:10px 4px;font-weight:700;color:white">${pName.split(' ')[0]}</td>
@@ -1851,7 +1963,7 @@ async function renderMessages(container) {
         <div class="section-title">Mensajes</div>
         ${unread ? `<div style="font-size:13px;color:var(--primary);margin-top:2px">${unread} sin leer</div>` : `<div class="section-subtitle">Bandeja de entrada</div>`}
       </div>
-      ${isAdmin ? `<button class="section-action" onclick="navigateTo('admin-compose')">✉️ Enviar</button>` : ''}
+      <button class="section-action" onclick="navigateTo('admin-compose')">✉️ Enviar</button>
     </div>
     <div class="card">`;
 
@@ -1893,7 +2005,15 @@ async function renderMessageDetail(container, { msgId }) {
         <div style="font-size:20px;font-weight:800;line-height:1.3;margin-bottom:8px">${m.title}</div>
         <div style="font-size:12px;color:var(--text-2)">De: <strong>${m.from}</strong> · ${fmtDateLong(m.date)}</div>
         <div style="height:1px;background:var(--glass-border);margin:16px 0"></div>
-        <div style="font-size:15px;color:var(--text-1);line-height:1.75">${m.body}</div>
+        <div style="font-size:15px;color:var(--text-1);line-height:1.75;white-space:pre-wrap">${m.body}</div>
+        
+        ${(APP.userData.role === 'admin' || (APP.userData.role === 'coach' && m.senderId === APP.userData.id)) ? `
+          <div style="height:1px;background:var(--glass-border);margin:20px 0"></div>
+          <div style="display:flex;gap:10px">
+            <button class="btn-full btn-ghost-full" style="flex:1;font-size:13px;padding:8px" onclick="editContent('messages','${m.id}', \`${m.body.replace(/`/g, '')}\`)">📝 Editar</button>
+            <button class="btn-full" style="flex:1;background:rgba(220,38,38,0.1);color:#ef4444;border:none;font-size:13px;padding:8px;border-radius:12px;font-weight:700" onclick="deleteMessage('${m.id}','${m.title}')">🗑️ Borrar</button>
+          </div>
+        ` : ''}
       </div>
     </div>
     <div style="height:16px"></div>`;
@@ -2795,8 +2915,13 @@ async function renderAdminCompose(container) {
         <div class="form-group" style="margin-bottom:14px">
           <label class="form-label" style="font-size:11px">DESTINATARIOS</label>
           <select class="form-input" id="msgTo" style="-webkit-appearance:none">
-            <option value="all">📢 Todos los usuarios del club</option>
-            ${teams.map(t => `<option value="team_${t.id}">👥 ${t.name} (y sus familias)</option>`).join('')}
+            ${['admin','coach'].includes(APP.userData.role) ? `
+              <option value="all">📢 Todos los usuarios del club</option>
+              ${teams.map(t => `<option value="team_${t.id}">👥 ${t.name} (y sus familias)</option>`).join('')}
+            ` : `
+              <option value="admins">🏢 Administración del Club</option>
+              ${APP.userData.teamId ? `<option value="coach_${APP.userData.teamId}">📋 Entrenador/a de mi equipo</option>` : ''}
+            `}
           </select>
         </div>
         <div class="form-group" style="margin-bottom:14px">
@@ -2825,7 +2950,7 @@ async function renderAdminCompose(container) {
     const body= document.getElementById('msgBody').value.trim();
     const imp = document.getElementById('msgImp').checked;
     if (!sub||!body) { showToast('Completa asunto y mensaje','error'); return; }
-    if (!IS_DEMO_MODE) await db.collection('messages').add({ title:sub, body, recipientId:to, from:APP.userData.name, important:imp, read:false, date:firebase.firestore.FieldValue.serverTimestamp() });
+    if (!IS_DEMO_MODE) await db.collection('messages').add({ title:sub, body, recipientId:to, senderId:APP.userData.id, from:APP.userData.name, important:imp, read:false, date:firebase.firestore.FieldValue.serverTimestamp() });
     showToast('Mensaje enviado ✓','success');
     goBack();
   };
@@ -2956,6 +3081,7 @@ async function renderAdminNews(container) {
     if (!IS_DEMO_MODE) {
       await db.collection('news').add({ 
         icon, category:cat, title, body, target, photo,
+        authorId:APP.userData.id, authorName:APP.userData.name,
         date:firebase.firestore.FieldValue.serverTimestamp() 
       });
     }
@@ -3097,6 +3223,9 @@ async function renderAdminApprovals(container) {
         const psnap = await db.collection('players').where('uid','==',r.targetId).get();
         psnap.forEach(d => d.ref.delete());
       }
+      else if (r.type === 'DELETE_NEWS' || r.type === 'DELETE_MESSAGE') {
+        await db.collection(r.targetCollection).doc(r.targetId).delete();
+      }
 
       await db.collection('pending_approvals').doc(id).delete();
       showToast('¡Solicitud aprobada y ejecutada!','success');
@@ -3106,3 +3235,50 @@ async function renderAdminApprovals(container) {
     }
   };
 }
+
+// Global actions for News and Messages
+window.deleteNews = async (id, title) => {
+  if (APP.userData.role === 'admin') {
+    if (confirm('¿Eliminar esta noticia?')) {
+      if (!IS_DEMO_MODE) await db.collection('news').doc(id).delete();
+      showToast('Noticia eliminada', 'success');
+      navigateTo('home');
+    }
+  } else if (APP.userData.role === 'coach') {
+    if (confirm('¿Solicitar a un Administrador que borre esta noticia?')) {
+      if (!IS_DEMO_MODE) await db.collection('pending_approvals').add({
+        type: 'DELETE_NEWS', targetCollection: 'news', targetId: id, name: title,
+        requestedBy: APP.userData.name, requestedById: APP.userData.id, timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      showToast('Solicitud enviada al Administrador', 'info');
+    }
+  }
+};
+
+window.deleteMessage = async (id, title) => {
+  if (APP.userData.role === 'admin') {
+    if (confirm('¿Retirar este mensaje para todos?')) {
+      if (!IS_DEMO_MODE) await db.collection('messages').doc(id).delete();
+      showToast('Mensaje retirado', 'success');
+      goBack();
+    }
+  } else if (APP.userData.role === 'coach') {
+    if (confirm('¿Solicitar a un Administrador que retire este mensaje?')) {
+      if (!IS_DEMO_MODE) await db.collection('pending_approvals').add({
+        type: 'DELETE_MESSAGE', targetCollection: 'messages', targetId: id, name: title,
+        requestedBy: APP.userData.name, requestedById: APP.userData.id, timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      showToast('Solicitud enviada al Administrador', 'info');
+    }
+  }
+};
+
+window.editContent = async (collection, id, currentBody) => {
+  const newVal = prompt("Edita el texto del contenido:", currentBody || "");
+  if (newVal !== null && newVal.trim() !== "") {
+    if (!IS_DEMO_MODE) await db.collection(collection).doc(id).update({ body: newVal.trim() });
+    showToast('Contenido actualizado correctamente', 'success');
+    if (collection === 'news') navigateTo('home'); 
+    else goBack();
+  }
+};
