@@ -432,13 +432,12 @@ async function renderHome(container) {
   const wins      = finished.filter(g => isWin(g));
   const isAdmin   = ['admin','coach'].includes(APP.userData.role);
 
-  container.innerHTML = `
-    const isStaff = ['admin','coach'].includes(APP.userData.role);
-    const canSeeNews = isStaff || APP.permissions.show_news;
-    const canSeeScores = isStaff || APP.permissions.show_scores;
-    const canSeeCalendar = isStaff || APP.permissions.show_calendar;
+  const isStaff = ['admin','coach'].includes(APP.userData.role);
+  const canSeeNews = isStaff || APP.permissions.show_news;
+  const canSeeScores = isStaff || APP.permissions.show_scores;
+  const canSeeCalendar = isStaff || APP.permissions.show_calendar;
 
-    container.innerHTML = `
+  container.innerHTML = `
       ${IS_DEMO_MODE ? `
       <div style="margin:12px 16px 0;padding:10px 14px;background:rgba(255,184,0,0.08);border:1px solid rgba(255,184,0,0.25);border-radius:12px;display:flex;align-items:center;gap:10px">
         <span style="font-size:18px">⚠️</span>
@@ -538,8 +537,6 @@ async function renderHome(container) {
       </div>` : ''}
 
       <div style="height:16px"></div>`;
-
-    <div style="height:16px"></div>`;
 }
 
 // ===================== VIEW: TEAMS =====================
