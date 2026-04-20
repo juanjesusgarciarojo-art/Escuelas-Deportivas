@@ -721,13 +721,14 @@ async function renderPlayerDetail(container, { playerId, teamId }) {
   if (!p) { container.innerHTML = `<div class="back-btn" onclick="goBack()">‹ Atrás</div><div class="empty-state"><div class="empty-icon">🤷</div><div class="empty-title">Jugador no encontrado</div></div>`; return; }
 
   // Robustecimiento: Si faltan datos en players pero hay UID, buscar en users
-  if ((!p.birth || !p.guardian || !p.parentPhone) && p.uid && !IS_DEMO_MODE) {
+  if ((!p.birth || !p.guardian || !p.parentPhone || !p.phone) && p.uid && !IS_DEMO_MODE) {
     const uDoc = await db.collection('users').doc(p.uid).get();
     if (uDoc.exists) {
       const u = uDoc.data();
-      p.birth = p.birth || u.birth;
+      p.birth = p.birth || u.birth || u.birthDate;
       p.guardian = p.guardian || u.guardian;
       p.parentPhone = p.parentPhone || u.parentPhone;
+      p.phone = p.phone || u.phone;
     }
   }
 
@@ -764,16 +765,21 @@ async function renderPlayerDetail(container, { playerId, teamId }) {
             <div style="font-size:10px;color:rgba(255,255,255,0.4)">NACIMIENTO</div>
             <div style="font-size:12px;font-weight:700;color:white">${p.birth ? fmtDate(p.birth) : '---'}</div>
           </div>
+          <div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.4)">TEL. JUGADOR/A</div>
+            <div style="font-size:12px;font-weight:700;color:white">${p.phone || '---'}</div>
+          </div>
+
           ${isMinor ? `
-          <div style="grid-column: span 2">
+          <div style="grid-column: span 2; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px; margin-top: 4px">
             <div style="font-size:10px;color:var(--primary);font-weight:800">TUTOR LEGAL (MENOR)</div>
             <div style="font-size:13px;font-weight:700;color:white;margin-top:2px">${p.guardian || 'Sin asignar'}</div>
-            <div style="font-size:12px;color:var(--text-2);margin-top:1px">📞 ${p.parentPhone || 'Sin teléfono'}</div>
+            <div style="font-size:12px;color:var(--text-2);margin-top:1px">📞 Tel. Tutor: ${p.parentPhone || 'Sin teléfono'}</div>
           </div>
           ` : `
-          <div>
-            <div style="font-size:10px;color:rgba(255,255,255,0.4)">MAYORÍA DE EDAD</div>
-            <div style="font-size:12px;font-weight:700;color:#10B981">✓ Sí</div>
+          <div style="grid-column: span 2; border-top: 1px solid rgba(16, 185, 129, 0.1); padding-top: 10px; margin-top: 4px">
+            <div style="font-size:10px;color:#10B981;font-weight:800">MAYORÍA DE EDAD</div>
+            <div style="font-size:12px;font-weight:700;color:white">✓ Este usuario es mayor de edad</div>
           </div>
           `}
         </div>
@@ -2393,7 +2399,7 @@ function roleLabelRaw(r) {
               <input class="form-input" id="nuBirth" type="date" onchange="checkUserMinor(this.value)">
             </div>
             <div class="form-group">
-              <label class="form-label">MI TELÉFONO</label>
+              <label class="form-label">MI TELÉFONO PERSONAL</label>
               <input class="form-input" id="nuPhone" type="tel" placeholder="6XXXXXXXX" maxlength="9" oninput="validatePhone(this)">
             </div>
           </div>
@@ -2580,7 +2586,7 @@ function roleLabelRaw(r) {
         if (role === 'player' && teamId) {
           await db.collection('players').add({
             uid, photo,
-            name, age, birth, number:parseInt(pNum), position:pPos, teamId,
+            name, age, birth, phone, number:parseInt(pNum), position:pPos, teamId,
             guardian: age < 18 ? guardian : null,
             parentPhone: age < 18 ? pPhone : null,
             active:true,
@@ -2627,7 +2633,7 @@ function roleLabelRaw(r) {
           </div>
           <div class="form-group" style="margin-bottom:12px">
             <label class="form-label">FECHA DE NACIMIENTO</label>
-            <input class="form-input" id="euBirth" type="date" value="${u.birth||''}" onchange="checkEditUserMinor(this.value)">
+            <input class="form-input" id="euBirth" type="date" value="${birthVal}" onchange="checkEditUserMinor(this.value)">
           </div>
           <div class="form-group" style="margin-bottom:12px">
             <label class="form-label">CORREO ELECTRÓNICO</label>
@@ -2642,19 +2648,19 @@ function roleLabelRaw(r) {
           </div>
           
           <div class="form-group" style="margin-bottom:12px">
-            <label class="form-label">TELÉFONO DE CONTACTO</label>
-            <input class="form-input" id="euPhone" type="tel" value="${u.phone||''}" maxlength="9" oninput="validatePhone(this)">
+            <label class="form-label">TELÉFONO DE CONTACTO (USUARIO/A)</label>
+            <input class="form-input" id="euPhone" type="tel" value="${u.phone||''}" maxlength="9" oninput="validatePhone(this)" placeholder="6XXXXXXXX">
           </div>
 
-          <div id="euMinorField" style="display:${calcAge(u.birth)<18?'block':'none'};margin-bottom:16px;background:rgba(255,107,44,0.05);padding:14px;border-radius:12px;border:1px solid rgba(255,107,44,0.2)">
+          <div id="euMinorField" style="display:${ageVal < 18 ? 'block' : 'none'};margin-bottom:16px;background:rgba(255,107,44,0.05);padding:14px;border-radius:12px;border:1px solid rgba(255,107,44,0.2)">
             <div style="font-size:11px;font-weight:900;color:var(--primary);margin-bottom:10px;text-transform:uppercase">Datos del representante (Menor de edad)</div>
             <div class="form-group" style="margin-bottom:12px">
               <label class="form-label" style="font-size:10px">NOMBRE DEL PADRE/MADRE/TUTOR</label>
               <input class="form-input" id="euGuardian" type="text" value="${u.guardian||''}">
             </div>
             <div class="form-group">
-              <label class="form-label" style="font-size:10px">TELÉFONO DEL TUTOR</label>
-              <input class="form-input" id="euParentPhone" type="tel" value="${u.parentPhone||''}" maxlength="9" oninput="validatePhone(this)">
+              <label class="form-label" style="font-size:10px">TELÉFONO DEL TUTOR (OBLIGATORIO)</label>
+              <input class="form-input" id="euParentPhone" type="tel" value="${u.parentPhone||''}" maxlength="9" oninput="validatePhone(this)" placeholder="6XXXXXXXX">
             </div>
           </div>
           <div class="form-group" style="margin-bottom:12px">
@@ -2749,7 +2755,7 @@ function roleLabelRaw(r) {
     }
 
     const data = { 
-      name, birth, phone, role, teamId, teamIds, email,
+      name, birth, birthDate: birth, phone, role, teamId, teamIds, email,
       guardian: age < 18 ? guardian : null,
       parentPhone: age < 18 ? pPhone : null
     };
@@ -2784,6 +2790,7 @@ function roleLabelRaw(r) {
             name: data.name, 
             teamId: data.teamId,
             birth: data.birth,
+            phone: data.phone,
             guardian: data.guardian,
             parentPhone: data.parentPhone
           };
