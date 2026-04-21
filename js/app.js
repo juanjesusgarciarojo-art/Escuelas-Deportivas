@@ -1005,10 +1005,10 @@ async function renderGameDetail(container, { gameId }) {
           <div class="card" style="margin:0 16px 16px;padding:16px;background:var(--bg-card-2);display:flex;flex-direction:column;align-items:center;">
             <div style="font-size:12px;font-weight:800;color:var(--text-3);margin-bottom:12px">CONFIRMAR ASISTENCIA</div>
             <div style="display:flex;gap:10px;width:100%">
-              <button class="btn-full" style="flex:1;background:\${myStatus==='yes' ? '#10B981':'rgba(255,255,255,0.05)'};color:\${myStatus==='yes' ? '#fff':'var(--text-2)'};font-weight:\${myStatus==='yes'?'800':'500'}" onclick="setRSVP('${g.id}','${actingPlayerId}','yes')">✅ Sí voy</button>
-              <button class="btn-full" style="flex:1;background:\${myStatus==='no' ? '#EF4444':'rgba(255,255,255,0.05)'};color:\${myStatus==='no' ? '#fff':'var(--text-2)'};font-weight:\${myStatus==='no'?'800':'500'}" onclick="setRSVP('${g.id}','${actingPlayerId}','no')">❌ No asisto</button>
+              <button class="btn-full" style="flex:1;background:${myStatus==='yes' ? '#10B981':'rgba(255,255,255,0.05)'};color:${myStatus==='yes' ? '#fff':'var(--text-2)'};font-weight:${myStatus==='yes'?'800':'500'}" onclick="setRSVP('${g.id}','${actingPlayerId}','yes')">✅ Sí voy</button>
+              <button class="btn-full" style="flex:1;background:${myStatus==='no' ? '#EF4444':'rgba(255,255,255,0.05)'};color:${myStatus==='no' ? '#fff':'var(--text-2)'};font-weight:${myStatus==='no'?'800':'500'}" onclick="setRSVP('${g.id}','${actingPlayerId}','no')">❌ No asisto</button>
             </div>
-            \${myStatus ? \`<div style="font-size:11px;color:var(--primary);margin-top:10px">✅ Respuesta guardada correctamente</div>\` : ''}
+            ${myStatus ? `<div style="font-size:11px;color:var(--primary);margin-top:10px">✅ Respuesta guardada correctamente</div>` : ''}
           </div>
         `;
       }
@@ -1021,20 +1021,20 @@ async function renderGameDetail(container, { gameId }) {
         <div class="card" style="margin:0 16px 16px;padding:16px">
           <div style="font-size:13px;font-weight:800;margin-bottom:12px;display:flex;justify-content:space-between">
             <span>📋 Asistencia de Jugadores</span>
-            <span style="color:var(--primary)">\${going.length} confirmados</span>
+            <span style="color:var(--primary)">${going.length} confirmados</span>
           </div>
-          \${going.length > 0 ? \`
-            <div style="font-size:12px;color:#10B981;font-weight:700;margin-top:8px">✅ Van a asistir (\${going.length})</div>
-            <div style="font-size:13px;color:var(--text-2);margin-top:4px">\${going.map(p => p.name).join(' • ')}</div>
-          \` : ''}
-          \${notGoing.length > 0 ? \`
-            <div style="font-size:12px;color:#EF4444;font-weight:700;margin-top:12px">❌ Han rechazado (\${notGoing.length})</div>
-            <div style="font-size:13px;color:var(--text-2);margin-top:4px">\${notGoing.map(p => p.name).join(' • ')}</div>
-          \` : ''}
-          \${unknown.length > 0 ? \`
-            <div style="font-size:12px;color:var(--text-3);font-weight:700;margin-top:12px">⏳ Por responder (\${unknown.length})</div>
-            <div style="font-size:13px;color:var(--text-3);margin-top:4px">\${unknown.map(p => p.name).join(' • ')}</div>
-          \` : ''}
+          ${going.length > 0 ? `
+            <div style="font-size:12px;color:#10B981;font-weight:700;margin-top:8px">✅ Van a asistir (${going.length})</div>
+            <div style="font-size:13px;color:var(--text-2);margin-top:4px">${going.map(p => p.name).join(' • ')}</div>
+          ` : ''}
+          ${notGoing.length > 0 ? `
+            <div style="font-size:12px;color:#EF4444;font-weight:700;margin-top:12px">❌ Han rechazado (${notGoing.length})</div>
+            <div style="font-size:13px;color:var(--text-2);margin-top:4px">${notGoing.map(p => p.name).join(' • ')}</div>
+          ` : ''}
+          ${unknown.length > 0 ? `
+            <div style="font-size:12px;color:var(--text-3);font-weight:700;margin-top:12px">⏳ Por responder (${unknown.length})</div>
+            <div style="font-size:13px;color:var(--text-3);margin-top:4px">${unknown.map(p => p.name).join(' • ')}</div>
+          ` : ''}
         </div>
       `;
     }
