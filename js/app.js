@@ -2583,6 +2583,12 @@ function roleLabelRaw(r) {
 
         await db.collection('users').doc(uid).set(userDataObj);
 
+        if (role === 'coach' && teamIds) {
+          for (const tid of teamIds) {
+            await db.collection('teams').doc(tid).update({ coachId: uid, coachName: name });
+          }
+        }
+
         if (role === 'player' && teamId) {
           await db.collection('players').add({
             uid, photo,
@@ -2611,6 +2617,9 @@ function roleLabelRaw(r) {
     ]);
     if (!u) { showToast('Usuario no encontrado','error'); return; }
     
+    const birthVal = u.birth || u.birthDate || '';
+    const ageVal = birthVal ? calcAge(birthVal) : 99;
+
     openModal(`
       <div class="modal-sheet" style="max-height:90vh">
         <div class="modal-handle"></div>
@@ -2782,7 +2791,38 @@ function roleLabelRaw(r) {
     }
 
     if (!IS_DEMO_MODE) {
+      const oldUserSnap = await db.collection('users').doc(userId).get();
+      const oldData = oldUserSnap.data();
       await db.collection('users').doc(userId).update(data);
+
+      // --- COACH SYNCHRONIZATION ---
+      if (role === 'coach' || oldData.role === 'coach') {
+        const oldTIds = oldData.teamIds || (oldData.teamId ? [oldData.teamId] : []);
+        const newTIds = data.teamIds || (data.teamId ? [data.teamId] : []);
+
+        // 1. Update name on ALL current teams if name changed
+        if (data.name !== oldData.name) {
+          for (const tid of newTIds) {
+            await db.collection('teams').doc(tid).update({ coachName: data.name });
+          }
+        }
+
+        // 2. Added teams: Set this coach
+        const added = newTIds.filter(id => !oldTIds.includes(id));
+        for (const tid of added) {
+          await db.collection('teams').doc(tid).update({ coachId: userId, coachName: data.name });
+        }
+
+        // 3. Removed teams: Clear coach if it's still THIS coach
+        const removed = oldTIds.filter(id => !newTIds.includes(id));
+        for (const tid of removed) {
+          const tDoc = await db.collection('teams').doc(tid).get();
+          if (tDoc.exists && tDoc.data().coachId === userId) {
+            await db.collection('teams').doc(tid).update({ coachId: null, coachName: '' });
+          }
+        }
+      }
+
       const psnap = await db.collection('players').where('uid','==',userId).get();
       if (!psnap.empty) {
         psnap.forEach(d => {
@@ -2833,6 +2873,19 @@ function roleLabelRaw(r) {
     }
 
     if (!IS_DEMO_MODE) {
+      const uDoc = await db.collection('users').doc(userId).get();
+      if (uDoc.exists) {
+        const uData = uDoc.data();
+        if (uData.role === 'coach') {
+          const tIds = uData.teamIds || (uData.teamId ? [uData.teamId] : []);
+          for (const tid of tIds) {
+            const tDoc = await db.collection('teams').doc(tid).get();
+            if (tDoc.exists && tDoc.data().coachId === userId) {
+              await db.collection('teams').doc(tid).update({ coachId: null, coachName: '' });
+            }
+          }
+        }
+      }
       await db.collection('users').doc(userId).delete();
       const psnap = await db.collection('players').where('uid','==',userId).get();
       psnap.forEach(d => d.ref.delete());
@@ -3135,6 +3188,83 @@ async function renderAdminTeams(container) {
     navigateTo('team-detail', { teamId });
   };
 
+window.showEditPlayerModal = async (playerId, teamId) => {
+    const p = IS_DEMO_MODE ? DEMO_DATA.players.find(x => x.id === playerId)
+                           : await db.collection('players').doc(playerId).get().then(d => ({id:d.id, ...d.data()}));
+    if (!p) return;
+
+    openModal(`
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div class="modal-title">Editar Jugador/a</div>
+        <div class="modal-body" style="padding-bottom:28px">
+          
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label">NOMBRE</label>
+            <input class="form-input" type="text" value="${p.name}" disabled style="opacity:0.6">
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+            <div class="form-group">
+              <label class="form-label">DORSAL</label>
+              <input class="form-input" id="epNum" type="number" value="${p.number || 0}" min="0" max="99">
+            </div>
+            <div class="form-group">
+              <label class="form-label">POSICIÓN</label>
+              <select class="form-input" id="epPos">
+                <option value="Sin definir" ${p.position === 'Sin definir' ? 'selected' : ''}>Sin definir</option>
+                <option ${p.position === 'Base' ? 'selected' : ''}>Base</option>
+                <option ${p.position === 'Escolta' ? 'selected' : ''}>Escolta</option>
+                <option ${p.position === 'Alero' ? 'selected' : ''}>Alero</option>
+                <option ${p.position === 'Ala-Pívot' ? 'selected' : ''}>Ala-Pívot</option>
+                <option ${p.position === 'Pívot' ? 'selected' : ''}>Pívot</option>
+              </select>
+            </div>
+          </div>
+          
+          <div style="margin-bottom:20px;padding:12px;background:rgba(255,255,255,0.03);border-radius:12px">
+            <div style="font-size:11px;font-weight:900;margin-bottom:10px;color:rgba(255,255,255,0.4)">OPCIONES DE FICHA</div>
+            <button class="btn-full" style="background:rgba(220,38,38,0.1);color:#ef4444;border:none;margin-bottom:8px" onclick="removePlayerFromTeam('${playerId}','${teamId}')">Quitar del equipo</button>
+            <div style="font-size:10px;color:rgba(255,255,255,0.3);text-align:center">Se mantendrá el usuario pero dejará de aparecer en este equipo.</div>
+          </div>
+
+          <button class="btn-full btn-primary-full" onclick="updatePlayerStatsInfo('${playerId}','${teamId}')" style="margin-bottom:10px">Guardar cambios</button>
+          <button class="btn-full btn-ghost-full" onclick="_closeModal()">Cancelar</button>
+        </div>
+      </div>`);
+};
+
+window.updatePlayerStatsInfo = async (playerId, teamId) => {
+    const num = parseInt(document.getElementById('epNum').value) || 0;
+    const pos = document.getElementById('epPos').value;
+
+    if (!IS_DEMO_MODE) {
+        await db.collection('players').doc(playerId).update({
+            number: num,
+            position: pos,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    }
+    _closeModal();
+    showToast('Ficha de jugador actualizada ✓', 'success');
+    navigateTo('team-detail', { teamId });
+};
+
+window.removePlayerFromTeam = async (playerId, teamId) => {
+    if (!confirm('¿Quitar a este jugador del equipo?')) return;
+    
+    if (!IS_DEMO_MODE) {
+        const p = (await db.collection('players').doc(playerId).get()).data();
+        await db.collection('players').doc(playerId).delete();
+        if (p.uid) {
+            await db.collection('users').doc(p.uid).update({ teamId: null });
+        }
+    }
+    _closeModal();
+    showToast('Jugador quitado del equipo', 'success');
+    navigateTo('team-detail', { teamId });
+};
+
 // ===================== VIEW: ADMIN COMPOSE =====================
 async function renderAdminCompose(container) {
   const teams = await getTeams();
@@ -3429,11 +3559,41 @@ async function renderAdminApprovals(container) {
             createdAt:firebase.firestore.FieldValue.serverTimestamp()
           });
         }
+        if (d.role === 'coach' && d.teamIds) {
+          for (const tid of d.teamIds) {
+            await db.collection('teams').doc(tid).update({ coachId: uid, coachName: d.name });
+          }
+        }
         await sec.auth().signOut();
         await sec.delete();
       } 
       else if (r.type === 'UPDATE') {
+        const oldUserSnap = await db.collection('users').doc(r.targetId).get();
+        const oldData = oldUserSnap.data();
         await db.collection('users').doc(r.targetId).update(r.newData);
+
+        // Coach Sync in Approval
+        const role = r.newData.role;
+        const name = r.newData.name;
+        if (role === 'coach' || oldData.role === 'coach') {
+          const oldTIds = oldData.teamIds || (oldData.teamId ? [oldData.teamId] : []);
+          const newTIds = r.newData.teamIds || (r.newData.teamId ? [r.newData.teamId] : []);
+
+          if (name !== oldData.name) {
+            for (const tid of newTIds) await db.collection('teams').doc(tid).update({ coachName: name });
+          }
+          const added = newTIds.filter(id => !oldTIds.includes(id));
+          for (const tid of added) await db.collection('teams').doc(tid).update({ coachId: r.targetId, coachName: name });
+          
+          const removed = oldTIds.filter(id => !newTIds.includes(id));
+          for (const tid of removed) {
+            const tDoc = await db.collection('teams').doc(tid).get();
+            if (tDoc.exists && tDoc.data().coachId === r.targetId) {
+              await db.collection('teams').doc(tid).update({ coachId: null, coachName: '' });
+            }
+          }
+        }
+
         const psnap = await db.collection('players').where('uid','==',r.targetId).get();
         if (!psnap.empty) {
           psnap.forEach(d => {
