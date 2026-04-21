@@ -2036,7 +2036,11 @@ async function renderMessages(container) {
         <div class="message-content">
           <div class="message-title ${!m.read?'unread':''}">${m.title}</div>
           <div class="message-preview">${m.body}</div>
-          ${isAdmin ? `<div style="font-size:9px;color:var(--primary);font-weight:900;margin-top:4px;text-transform:uppercase">PARA: ${m.recipientId === 'all' ? 'TODO EL CLUB' : (m.targetName || m.recipientId)}</div>` : ''}
+          <div style="font-size:10px;color:var(--text-3);margin-top:4px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+            <span style="font-weight:700;color:var(--text-2)">📝 ${m.from || 'Club'}</span>
+            <span style="opacity:0.5">▶</span>
+            <span style="font-weight:800;color:var(--primary)">${m.recipientLabel || (m.recipientId === 'all' ? 'Todo el club' : m.recipientId)}</span>
+          </div>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0">
           <div class="message-time">${fmtTimeAgo(m.date)}</div>
@@ -2062,7 +2066,11 @@ async function renderMessageDetail(container, { msgId }) {
       <div style="padding:20px">
         ${m.important ? `<div class="tag tag-orange" style="margin-bottom:12px">📢 Importante</div>` : ''}
         <div style="font-size:20px;font-weight:800;line-height:1.3;margin-bottom:8px">${m.title}</div>
-        <div style="font-size:12px;color:var(--text-2)">De: <strong>${m.from}</strong> · ${fmtDateLong(m.date)}</div>
+        <div style="font-size:12px;color:var(--text-2);display:flex;flex-direction:column;gap:2px">
+          <div>De: <strong>${m.from}</strong></div>
+          <div>Para: <strong style="color:var(--primary)">${m.recipientLabel || (m.recipientId === 'all' ? 'Todo el club' : m.recipientId)}</strong></div>
+          <div style="opacity:0.6;margin-top:4px">${fmtDateLong(m.date)}</div>
+        </div>
         <div style="height:1px;background:var(--glass-border);margin:16px 0"></div>
         <div style="font-size:15px;color:var(--text-1);line-height:1.75;white-space:pre-wrap">${m.body}</div>
         
@@ -3325,12 +3333,28 @@ async function renderAdminCompose(container) {
     <div style="height:16px"></div>`;
 
   window.sendMsg = async () => {
-    const to  = document.getElementById('msgTo').value;
+    const toEl = document.getElementById('msgTo');
+    const to   = toEl.value;
+    const toLabel = toEl.options[toEl.selectedIndex].text;
     const sub = document.getElementById('msgSubject').value.trim();
     const body= document.getElementById('msgBody').value.trim();
     const imp = document.getElementById('msgImp').checked;
+    
     if (!sub||!body) { showToast('Completa asunto y mensaje','error'); return; }
-    if (!IS_DEMO_MODE) await db.collection('messages').add({ title:sub, body, recipientId:to, senderId:APP.userData.id, from:APP.userData.name, important:imp, read:false, date:firebase.firestore.FieldValue.serverTimestamp() });
+    
+    const msgData = { 
+      title: sub, 
+      body, 
+      recipientId: to, 
+      recipientLabel: toLabel,
+      senderId: APP.userData.id, 
+      from: APP.userData.name, 
+      important: imp, 
+      read: false, 
+      date: firebase.firestore.FieldValue.serverTimestamp() 
+    };
+
+    if (!IS_DEMO_MODE) await db.collection('messages').add(msgData);
     showToast('Mensaje enviado ✓','success');
     goBack();
   };
