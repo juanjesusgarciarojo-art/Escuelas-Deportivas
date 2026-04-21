@@ -259,8 +259,15 @@ async function getMessages() {
       const recipients = getMessageRecipients(APP.userData);
       q = q.where('recipientId', 'in', recipients);
     }
-    const snap = await q.orderBy('date', 'desc').get();
-    return snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    const snap = await q.limit(50).get();
+    const msgs = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    
+    // Ordenar en memoria por fecha descendiente para evitar necesidad de índices compuestos en Firebase
+    return msgs.sort((a, b) => {
+      const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0);
+      const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0);
+      return dateB - dateA;
+    });
   } catch(e) { console.error(e); return []; }
 }
 
