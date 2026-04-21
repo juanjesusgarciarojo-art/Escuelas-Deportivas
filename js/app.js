@@ -92,8 +92,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Normalización: si existe 'rol' pero no 'role', lo copiamos
         if (data.rol && !data.role) APP.userData.role = data.rol;
 
+        const recipients = getMessageRecipients(APP.userData);
         const msgs = await db.collection('messages')
-          .where('recipientId','in',['all', user.uid])
+          .where('recipientId','in', recipients)
           .where('read','==',false).get();
         APP.unreadCount = msgs.size;
       } catch(e) { console.error(e); }
@@ -255,10 +256,8 @@ async function getMessages() {
     const role = APP.userData.role;
     let q = db.collection('messages');
     if (role !== 'admin' && role !== 'gestor') {
-      const tIds = APP.userData.teamIds || (APP.userData.teamId ? [APP.userData.teamId] : []);
-      const recipients = ['all', APP.userData.id];
-      if (tIds.length > 0) recipients.push(...tIds);
-      q = q.where('recipientId', 'in', recipients.slice(0, 10));
+      const recipients = getMessageRecipients(APP.userData);
+      q = q.where('recipientId', 'in', recipients);
     }
     const snap = await q.orderBy('date', 'desc').get();
     return snap.docs.map(d => ({ id:d.id, ...d.data() }));
@@ -283,7 +282,24 @@ async function getNews() {
   } catch(e) { console.error("Error cargando noticias:", e); return []; }
 }
 
-// ===================== UTILITY =====================
+function getMessageRecipients(userData) {
+  if (!userData) return ['all'];
+  const role = userData.role || userData.rol;
+  const tIds = userData.teamIds || (userData.teamId ? [userData.teamId] : []);
+  const recipients = ['all', userData.id];
+  
+  tIds.forEach(tid => {
+    recipients.push(`team_${tid}`);
+    if (role === 'coach') recipients.push(`coach_${tid}`);
+  });
+  
+  if (role === 'admin' || role === 'gestor') {
+    if (!recipients.includes('admins')) recipients.push('admins');
+  }
+  
+  return recipients.slice(0, 10);
+}
+
 function initials(name = '') {
   return name.split(' ').slice(0,2).map(n => n[0]||'').join('').toUpperCase() || '?';
 }
