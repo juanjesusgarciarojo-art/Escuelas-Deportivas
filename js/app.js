@@ -2478,12 +2478,14 @@ function roleLabelRaw(r) {
       const teams = JSON.parse(container.dataset.teams || '[]');
       
       if (role === 'coach') {
+         // Ordenar equipos por nombre para nuevo usuario
+         const sortedTeams = [...teams].sort((a,b) => a.name.localeCompare(b.name));
          container.innerHTML = `
             <label class="form-label">EQUIPOS ASIGNADOS</label>
-            <select class="form-input" id="nuTeam" multiple style="height:100px;padding:8px">
-               ${teams.map(t => `<option value="${t.id}">${t.name}</option>`).join('')}
+            <select class="form-input" id="nuTeam" multiple style="height:120px;padding:8px">
+               ${sortedTeams.map(t => `<option value="${t.id}">${t.name}</option>`).join('')}
             </select>
-            <div style="font-size:10px;color:rgba(255,107,44,0.7);margin-top:4px;font-weight:700">Selección múltiple activada 🖱️ (Mantén Ctrl/Cmd)</div>
+            <div style="font-size:10px;color:rgba(255,107,44,0.7);margin-top:6px;font-weight:700">Selección múltiple activada 🖱️ (Mantén Ctrl/Cmd)</div>
          `;
       } else {
          container.innerHTML = `
@@ -2700,12 +2702,27 @@ function roleLabelRaw(r) {
       const userTIds = JSON.parse(container.dataset.userTeamIds || '[]');
 
       if (role === 'coach') {
+        // Ordenar: primero los asignados (stick), luego el resto por nombre
+        const sortedTeams = [...teamsList].sort((a, b) => {
+          const aAss = (userTIds.includes(a.id) || userTId === a.id);
+          const bAss = (userTIds.includes(b.id) || userTId === b.id);
+          if (aAss !== bAss) return bAss - aAss;
+          return a.name.localeCompare(b.name);
+        });
+
         container.innerHTML = `
           <label class="form-label">EQUIPOS ASIGNADOS</label>
-          <select class="form-input" id="euTeam" multiple style="height:100px;padding:8px">
-            ${teamsList.map(t => `<option value="${t.id}" ${(userTIds.includes(t.id) || userTId === t.id)?'selected':''}>${t.name}</option>`).join('')}
+          <select class="form-input" id="euTeam" multiple style="height:140px;padding:8px">
+            ${sortedTeams.map(t => {
+              const isAssigned = (userTIds.includes(t.id) || userTId === t.id);
+              return `<option value="${t.id}" ${isAssigned ? 'selected' : ''}>
+                ${isAssigned ? '✓ ' : ''}${t.name}
+              </option>`;
+            }).join('')}
           </select>
-          <div style="font-size:10px;color:rgba(255,107,44,0.7);margin-top:4px;font-weight:700">Selección múltiple (Ctrl/Cmd click) 🖱️</div>
+          <div style="font-size:10px;color:rgba(255,107,44,0.7);margin-top:6px;font-weight:700">
+            Marcados con ✓ están asignados. Mantén Ctrl/Cmd para añadir/quitar.
+          </div>
         `;
       } else {
         container.innerHTML = `

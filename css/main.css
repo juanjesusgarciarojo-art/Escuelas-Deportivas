@@ -161,6 +161,12 @@ select.form-input option {
   padding: 12px;
 }
 
+select.form-input[multiple] {
+  background-image: none;
+  padding-right: 18px;
+  height: auto;
+}
+
 .form-input:focus {
   border-color: var(--primary);
   background: rgba(255,107,44,0.06);
