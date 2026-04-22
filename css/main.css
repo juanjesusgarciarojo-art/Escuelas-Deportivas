@@ -132,34 +132,46 @@ body {
   text-transform: uppercase;
 }
 
-  cursor: pointer;
+.form-input {
+  width: 100%;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  font-family: var(--font);
+  font-size: 15px;
+  color: var(--text-1);
+  transition: all 0.2s var(--ease);
+  outline: none;
 }
 
 .password-wrapper {
   position: relative;
-  display: flex;
-  align-items: center;
+  width: 100%;
 }
 
 .password-toggle {
   position: absolute;
-  right: 14px;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
   background: none;
   border: none;
   color: var(--text-3);
   cursor: pointer;
   padding: 8px;
-  font-size: 18px;
+  font-size: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: color 0.2s;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
+  z-index: 5;
 }
 
-.password-toggle:hover, .password-toggle:active {
-  color: var(--text-1);
+.password-toggle:hover {
+  color: var(--primary);
 }
 
 
