@@ -34,8 +34,13 @@
 
     <div class="form-group">
       <label class="form-label" for="loginPassword">Contraseña</label>
-      <input class="form-input" type="password" id="loginPassword"
-             placeholder="••••••••" autocomplete="current-password">
+      <div class="password-wrapper">
+        <input class="form-input" type="password" id="loginPassword"
+               placeholder="••••••••" autocomplete="current-password">
+        <button type="button" class="password-toggle" id="togglePassword" onclick="togglePasswordVisibility('loginPassword', 'togglePassword')">
+          👁️
+        </button>
+      </div>
     </div>
 
     <div class="login-error" id="loginError"></div>

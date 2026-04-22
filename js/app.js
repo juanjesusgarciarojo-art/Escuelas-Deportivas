@@ -93,10 +93,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data.rol && !data.role) APP.userData.role = data.rol;
 
         const recipients = getMessageRecipients(APP.userData);
+        // Obtenemos los mensajes no leídos recientes y filtramos en local para mayor fiabilidad
         const msgs = await db.collection('messages')
-          .where('recipientId','in', recipients)
-          .where('read','==',false).get();
-        APP.unreadCount = msgs.size;
+          .where('read','==',false)
+          .limit(100)
+          .get();
+        const unreadList = msgs.docs.map(d => d.data());
+        APP.unreadCount = unreadList.filter(m => recipients.includes(m.recipientId)).length;
       } catch(e) { console.error(e); }
       setupShell();
       navigateTo('home');
@@ -257,17 +260,16 @@ async function getMessages() {
     let q = db.collection('messages');
     if (role !== 'admin' && role !== 'gestor') {
       const recipients = getMessageRecipients(APP.userData);
-      q = q.where('recipientId', 'in', recipients);
+      // Obtenemos los 100 mensajes más recientes del club y filtramos en local
+      // Esto evita problemas de índices compuestos y límites de la consulta 'in' de Firestore
+      const snap = await db.collection('messages').orderBy('date', 'desc').limit(100).get();
+      const allMsgs = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+      return allMsgs.filter(m => recipients.includes(m.recipientId));
     }
-    const snap = await q.limit(50).get();
-    const msgs = snap.docs.map(d => ({ id:d.id, ...d.data() }));
     
-    // Ordenar en memoria por fecha descendiente para evitar necesidad de índices compuestos en Firebase
-    return msgs.sort((a, b) => {
-      const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0);
-      const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0);
-      return dateB - dateA;
-    });
+    // Para administradores, mostramos todo
+    const snap = await db.collection('messages').orderBy('date', 'desc').limit(100).get();
+    return snap.docs.map(d => ({ id:d.id, ...d.data() }));
   } catch(e) { console.error(e); return []; }
 }
 
@@ -2221,15 +2223,30 @@ async function renderProfile(container) {
       <div class="modal-body" style="padding-bottom:24px">
         <div class="form-group" style="margin-bottom:12px">
           <label class="form-label" style="font-size:11px">CONTRASEÑA ACTUAL</label>
-          <input class="form-input" type="password" id="pwOld" placeholder="••••••••">
+          <div class="password-wrapper">
+            <input class="form-input" type="password" id="pwOld" placeholder="••••••••">
+            <button type="button" class="password-toggle" id="togglePwOld" onclick="togglePasswordVisibility('pwOld', 'togglePwOld')">
+              👁️
+            </button>
+          </div>
         </div>
         <div class="form-group" style="margin-bottom:12px">
           <label class="form-label" style="font-size:11px">NUEVA CONTRASEÑA</label>
-          <input class="form-input" type="password" id="pwNew" placeholder="••••••••">
+          <div class="password-wrapper">
+            <input class="form-input" type="password" id="pwNew" placeholder="••••••••">
+            <button type="button" class="password-toggle" id="togglePwNew" onclick="togglePasswordVisibility('pwNew', 'togglePwNew')">
+              👁️
+            </button>
+          </div>
         </div>
         <div class="form-group" style="margin-bottom:20px">
           <label class="form-label" style="font-size:11px">CONFIRMAR CONTRASEÑA</label>
-          <input class="form-input" type="password" id="pwNew2" placeholder="••••••••">
+          <div class="password-wrapper">
+            <input class="form-input" type="password" id="pwNew2" placeholder="••••••••">
+            <button type="button" class="password-toggle" id="togglePwNew2" onclick="togglePasswordVisibility('pwNew2', 'togglePwNew2')">
+              👁️
+            </button>
+          </div>
         </div>
         <button class="btn-full btn-primary-full" onclick="savePw()">Guardar</button>
         <button class="btn-full btn-ghost-full" style="margin-top:10px" onclick="_closeModal()">Cancelar</button>
@@ -3316,6 +3333,9 @@ window.removePlayerFromTeam = async (playerId, teamId) => {
 // ===================== VIEW: ADMIN COMPOSE =====================
 async function renderAdminCompose(container) {
   const teams = await getTeams();
+  const userRole = APP.userData.role || APP.userData.rol;
+  const isAdminOrCoach = ['admin', 'coach', 'gestor'].includes(userRole);
+
   container.innerHTML = `
     <button class="back-btn" onclick="goBack()">‹ Panel Admin</button>
     <div class="section-header">
@@ -3326,9 +3346,9 @@ async function renderAdminCompose(container) {
         <div class="form-group" style="margin-bottom:14px">
           <label class="form-label" style="font-size:11px">DESTINATARIOS</label>
           <select class="form-input" id="msgTo" style="-webkit-appearance:none">
-            ${['admin','coach'].includes(APP.userData.role) ? `
+            ${isAdminOrCoach ? `
               <option value="all">📢 Todos los usuarios del club</option>
-              ${teams.map(t => `<option value="team_${t.id}">👥 ${t.name} (y sus familias)</option>`).join('')}
+              ${teams.length > 0 ? teams.map(t => `<option value="team_${t.id}">👥 ${t.name} (y sus familias)</option>`).join('') : ''}
             ` : `
               <option value="admins">🏢 Administración del Club</option>
               ${APP.userData.teamId ? `<option value="coach_${APP.userData.teamId}">📋 Entrenador/a de mi equipo</option>` : ''}
@@ -3358,10 +3378,12 @@ async function renderAdminCompose(container) {
   window.sendMsg = async () => {
     const toEl = document.getElementById('msgTo');
     const to   = toEl.value;
-    const toLabel = toEl.options[toEl.selectedIndex].text;
+    const selectedOpt = toEl.options[toEl.selectedIndex];
+    const toLabel = selectedOpt ? selectedOpt.text : 'Desconocido';
     const sub = document.getElementById('msgSubject').value.trim();
     const body= document.getElementById('msgBody').value.trim();
     const imp = document.getElementById('msgImp').checked;
+    const btn = document.querySelector('button[onclick="sendMsg()"]');
     
     if (!sub||!body) { showToast('Completa asunto y mensaje','error'); return; }
     
@@ -3377,9 +3399,21 @@ async function renderAdminCompose(container) {
       date: firebase.firestore.FieldValue.serverTimestamp() 
     };
 
-    if (!IS_DEMO_MODE) await db.collection('messages').add(msgData);
-    showToast('Mensaje enviado ✓','success');
-    goBack();
+    try {
+      if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
+      if (!IS_DEMO_MODE) {
+        await db.collection('messages').add(msgData);
+      } else {
+        // En modo demo, simulamos el envío para que la UI responda
+        await new Promise(r => setTimeout(r, 600));
+      }
+      showToast('Mensaje enviado ✓','success');
+      goBack();
+    } catch (error) {
+      console.error("Error enviando mensaje:", error);
+      showToast('Error al enviar: ' + (error.message || 'Error desconocido'), 'error');
+      if (btn) { btn.disabled = false; btn.textContent = '✉️ Enviar mensaje'; }
+    }
   };
 }
 
@@ -3739,3 +3773,17 @@ window.editContent = async (collection, id, currentBody) => {
     else goBack();
   }
 };
+
+window.togglePasswordVisibility = (inputId, toggleBtnId) => {
+  const passwordInput = document.getElementById(inputId);
+  const toggleButton = document.getElementById(toggleBtnId);
+  
+  if (passwordInput.type === 'password') {
+    passwordInput.type = 'text';
+    toggleButton.textContent = '🙈'; // Ocultar
+  } else {
+    passwordInput.type = 'password';
+    toggleButton.textContent = '👁️'; // Mostrar
+  }
+};
+

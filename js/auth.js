@@ -78,6 +78,20 @@ function handleResetPassword() {
   showLoginInfo('Para recuperar tu contraseña contacta con el club. Son ellos quienes gestionan todos los accesos de la app.');
 }
 
+// Alternar visibilidad de la contraseña
+function togglePasswordVisibility(inputId, toggleBtnId) {
+  const passwordInput = document.getElementById(inputId);
+  const toggleButton = document.getElementById(toggleBtnId);
+  
+  if (passwordInput.type === 'password') {
+    passwordInput.type = 'text';
+    toggleButton.textContent = '🙈'; // Ocultar
+  } else {
+    passwordInput.type = 'password';
+    toggleButton.textContent = '👁️'; // Mostrar
+  }
+}
+
 // Enter para hacer login
 document.addEventListener('keypress', e => {
   if (e.key === 'Enter') doLogin();
