@@ -257,20 +257,44 @@ async function getMessages() {
   if (IS_DEMO_MODE) return [...DEMO_DATA.messages];
   try {
     const role = APP.userData.role;
-    let q = db.collection('messages');
-    if (role !== 'admin' && role !== 'gestor') {
-      const recipients = getMessageRecipients(APP.userData);
-      // Obtenemos los 100 mensajes más recientes del club y filtramos en local
-      // Esto evita problemas de índices compuestos y límites de la consulta 'in' de Firestore
+
+    // Admins y gestores ven todo
+    if (role === 'admin' || role === 'gestor') {
       const snap = await db.collection('messages').orderBy('date', 'desc').limit(100).get();
-      const allMsgs = snap.docs.map(d => ({ id:d.id, ...d.data() }));
-      return allMsgs.filter(m => recipients.includes(m.recipientId));
+      return snap.docs.map(d => ({ id:d.id, ...d.data() }));
     }
-    
-    // Para administradores, mostramos todo
-    const snap = await db.collection('messages').orderBy('date', 'desc').limit(100).get();
-    return snap.docs.map(d => ({ id:d.id, ...d.data() }));
-  } catch(e) { console.error(e); return []; }
+
+    // Para el resto: hacer consultas individuales por cada recipientId permitido
+    // Esto garantiza que Firestore solo devuelve docs que las reglas permiten leer
+    const recipients = getMessageRecipients(APP.userData);
+    const queries = recipients.map(rid =>
+      db.collection('messages').where('recipientId', '==', rid).limit(50).get()
+    );
+
+    // También incluir mensajes enviados por el propio usuario (emisor)
+    queries.push(
+      db.collection('messages').where('senderId', '==', APP.userData.id).limit(50).get()
+    );
+
+    const snaps = await Promise.all(queries);
+    const seen = new Set();
+    const all = [];
+    snaps.forEach(snap => {
+      snap.docs.forEach(d => {
+        if (!seen.has(d.id)) {
+          seen.add(d.id);
+          all.push({ id: d.id, ...d.data() });
+        }
+      });
+    });
+
+    // Ordenar por fecha descendente
+    return all.sort((a, b) => {
+      const ta = a.date?.toMillis?.() ?? 0;
+      const tb = b.date?.toMillis?.() ?? 0;
+      return tb - ta;
+    });
+  } catch(e) { console.error('Error cargando mensajes:', e); return []; }
 }
 
 async function getNews() {
@@ -306,7 +330,7 @@ function getMessageRecipients(userData) {
     if (!recipients.includes('admins')) recipients.push('admins');
   }
   
-  return recipients.slice(0, 10);
+  return recipients;
 }
 
 function initials(name = '') {
