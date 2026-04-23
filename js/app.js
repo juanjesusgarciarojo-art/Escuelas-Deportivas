@@ -2099,11 +2099,11 @@ async function renderMessageDetail(container, { msgId }) {
         <div style="height:1px;background:var(--glass-border);margin:16px 0"></div>
         <div style="font-size:15px;color:var(--text-1);line-height:1.75;white-space:pre-wrap">${m.body}</div>
         
-        ${(APP.userData.role === 'admin' || (APP.userData.role === 'coach' && m.senderId === APP.userData.id)) ? `
+        ${(APP.userData.role === 'admin' || m.senderId === APP.userData.id) ? `
           <div style="height:1px;background:var(--glass-border);margin:20px 0"></div>
           <div style="display:flex;gap:10px">
-            <button class="btn-full btn-ghost-full" style="flex:1;font-size:13px;padding:8px" onclick="editContent('messages','${m.id}', \`${m.body.replace(/`/g, '')}\`)">📝 Editar</button>
-            <button class="btn-full" style="flex:1;background:rgba(220,38,38,0.1);color:#ef4444;border:none;font-size:13px;padding:8px;border-radius:12px;font-weight:700" onclick="deleteMessage('${m.id}','${m.title}')">🗑️ Borrar</button>
+            ${APP.userData.role === 'admin' ? `<button class="btn-full btn-ghost-full" style="flex:1;font-size:13px;padding:8px" onclick="editContent('messages','${m.id}', \`${m.body.replace(/`/g, '')}\`)">📝 Editar</button>` : ''}
+            <button class="btn-full" style="${APP.userData.role === 'admin' ? 'flex:1;' : ''}background:rgba(220,38,38,0.1);color:#ef4444;border:none;font-size:13px;padding:8px;border-radius:12px;font-weight:700" onclick="deleteMessage('${m.id}','${m.title}')">🗑️ Borrar</button>
           </div>
         ` : ''}
       </div>
@@ -2604,8 +2604,8 @@ function roleLabelRaw(r) {
     }
 
     const userDataObj = { 
-      name, birthDate:birth, phone, photo, guardian: age<18?guardian:null, parentPhone: age<18?pPhone:null, 
-      email, role, teamId, teamIds, active:true,
+      name, birth, birthDate:birth, phone, photo, guardian: age<18?guardian:null, parentPhone: age<18?pPhone:null, 
+      email, role, teamId, teamIds: teamIds || [], active:true,
       createdAt:firebase.firestore.FieldValue.serverTimestamp()
     };
 
@@ -3387,10 +3387,19 @@ async function renderAdminCompose(container) {
     
     if (!sub||!body) { showToast('Completa asunto y mensaje','error'); return; }
     
+    // Derivar recipientType del valor de recipientId
+    let recipientType;
+    if (to === 'all')                      recipientType = 'all';
+    else if (to.startsWith('team_'))       recipientType = 'team';
+    else if (to.startsWith('coach_'))      recipientType = 'coach';
+    else if (to === 'admins')              recipientType = 'admins';
+    else                                   recipientType = 'user'; // UID directo
+
     const msgData = { 
       title: sub, 
       body, 
       recipientId: to, 
+      recipientType,
       recipientLabel: toLabel,
       senderId: APP.userData.id, 
       from: APP.userData.name, 
@@ -3747,20 +3756,14 @@ window.deleteNews = async (id, title) => {
 };
 
 window.deleteMessage = async (id, title) => {
-  if (APP.userData.role === 'admin') {
-    if (confirm('¿Retirar este mensaje para todos?')) {
-      if (!IS_DEMO_MODE) await db.collection('messages').doc(id).delete();
-      showToast('Mensaje retirado', 'success');
-      goBack();
-    }
-  } else if (APP.userData.role === 'coach') {
-    if (confirm('¿Solicitar a un Administrador que retire este mensaje?')) {
-      if (!IS_DEMO_MODE) await db.collection('pending_approvals').add({
-        type: 'DELETE_MESSAGE', targetCollection: 'messages', targetId: id, name: title,
-        requestedBy: APP.userData.name, requestedById: APP.userData.id, timestamp: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      showToast('Solicitud enviada al Administrador', 'info');
-    }
+  if (!confirm('¿Eliminar este mensaje?')) return;
+  try {
+    if (!IS_DEMO_MODE) await db.collection('messages').doc(id).delete();
+    showToast('Mensaje eliminado', 'success');
+    goBack();
+  } catch(e) {
+    console.error('Error al eliminar mensaje:', e);
+    showToast('No tienes permiso para eliminar este mensaje', 'error');
   }
 };
 
