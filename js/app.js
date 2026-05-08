@@ -398,11 +398,11 @@ function openModal(html) {
 }
 
 function avatarBg(i = 0) {
-  const bgs = ['linear-gradient(135deg,#FF6B2C,#FF8C00)',
-                'linear-gradient(135deg,#3B82F6,#1D4ED8)',
-                'linear-gradient(135deg,#8B5CF6,#6D28D9)',
-                'linear-gradient(135deg,#10B981,#047857)',
-                'linear-gradient(135deg,#F59E0B,#B45309)'];
+  const bgs = ['linear-gradient(135deg,#00875A,#10B981)',
+                'linear-gradient(135deg,#10B981,#34D399)',
+                'linear-gradient(135deg,#047857,#059669)',
+                'linear-gradient(135deg,#00875A,#065F46)',
+                'linear-gradient(135deg,#34D399,#A7F3D0)'];
   return bgs[i % bgs.length];
 }
 
@@ -791,8 +791,8 @@ async function renderPlayerDetail(container, { playerId, teamId }) {
   container.innerHTML = `
     <button class="back-btn" onclick="goBack()">‹ Equipo</button>
 
-    <div style="background:linear-gradient(160deg,rgba(255,107,44,0.15) 0%,transparent 60%);padding:24px 16px 16px;text-align:center">
-      <div style="width:100px;height:100px;border-radius:50%;${p.photo?'':'background:var(--glass)'};display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:900;margin:0 auto 12px;border:3px solid rgba(255,107,44,0.4);box-shadow:0 0 0 6px rgba(255,107,44,0.1);overflow:hidden">
+    <div style="background:linear-gradient(160deg,rgba(0, 135, 90,0.15) 0%,transparent 60%);padding:24px 16px 16px;text-align:center">
+      <div style="width:100px;height:100px;border-radius:50%;${p.photo?'':'background:var(--glass)'};display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:900;margin:0 auto 12px;border:3px solid rgba(0, 135, 90,0.4);box-shadow:0 0 0 6px rgba(0, 135, 90,0.1);overflow:hidden">
         ${p.photo ? `<img src="${p.photo}" style="width:100%;height:100%;object-fit:cover">` : initials(p.name)}
       </div>
       <div style="font-size:24px;font-weight:900">${p.name}</div>
@@ -872,7 +872,7 @@ async function renderPlayerDetail(container, { playerId, teamId }) {
        <div class="card" style="padding:16px">
           <div style="font-size:12px;font-weight:800;color:var(--text-2);margin-bottom:12px">ESPECIALIDADES DEL JUGADOR</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-             ${(p.stats?.pts/p.stats?.gp) > 12 ? '<span class="tag" style="background:rgba(255,107,44,0.1);color:var(--primary)">🔥 ANOTADOR</span>' : ''}
+             ${(p.stats?.pts/p.stats?.gp) > 12 ? '<span class="tag" style="background:rgba(0, 135, 90,0.1);color:var(--primary)">🔥 ANOTADOR</span>' : ''}
              ${(p.stats?.reb/p.stats?.gp) > 6 ? '<span class="tag" style="background:rgba(59,130,246,0.1);color:#60A5FA">🛡️ BALUARTE</span>' : ''}
              ${(p.stats?.ast/p.stats?.gp) > 4 ? '<span class="tag" style="background:rgba(16,185,129,0.1);color:#10B981">🎯 DIRECTOR</span>' : ''}
              ${(p.stats?.gp) > 0 ? `<span class="tag" style="background:rgba(255,184,0,0.1);color:#FFB800">✨ MVPs: ${p.stats?.mvpCount||0}</span>` : ''}
@@ -1421,7 +1421,7 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
         const val = calculateVal(s);
         const foulWarn = s.pf >= 4 ? 'color:#FF4444;font-weight:900;animation:pulse 1s infinite' : '';
         return `
-          <div class="psBtn" onclick="selectPlayer('${p.id}', this)" style="${p.id === selPlayerId ? 'border-color:var(--primary);background:rgba(255,107,44,0.12);color:var(--primary)' : ''}">
+          <div class="psBtn" onclick="selectPlayer('${p.id}', this)" style="${p.id === selPlayerId ? 'border-color:var(--primary);background:rgba(0, 135, 90,0.12);color:var(--primary)' : ''}">
             <div style="display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;padding-bottom:2px">
                <span style="font-size:10px;font-weight:800;opacity:0.8">${p.number||'00'}</span>
                <span style="width:6px;height:6px;border-radius:50%;background:${s.onCourt ? '#4CAF50' : '#888'}"></span>
@@ -1485,7 +1485,7 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
       </div>
     </div>
 
-    <div style="background:linear-gradient(135deg,rgba(255,107,44,0.1),rgba(255,107,44,0.04));padding:20px 16px;border-bottom:1px solid var(--glass-border)">
+    <div style="background:linear-gradient(135deg,rgba(0, 135, 90,0.1),rgba(0, 135, 90,0.04));padding:20px 16px;border-bottom:1px solid var(--glass-border)">
       <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;text-align:center;margin-bottom:16px">
         <div>
           <div style="font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:4px">${teamName||'Gallardas'}</div>
@@ -1664,7 +1664,7 @@ async function renderGameLive(container, { teamId, teamName, gameId, isPractice 
     const s = document.createElement('style');
     s.innerHTML = `
       .s5-card { background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:12px; text-align:center; cursor:pointer; transition:all 0.2s; }
-      .s5-card.active { border-color:var(--primary); background:rgba(255,107,44,0.1); }
+      .s5-card.active { border-color:var(--primary); background:rgba(0, 135, 90,0.1); }
     `;
     document.head.appendChild(s);
   };
@@ -1817,7 +1817,7 @@ async function renderGameRecap(container, { gameId }) {
       <div style="margin-left:auto;font-size:12px;font-weight:800;color:var(--text-3)">INFORME FINAL</div>
     </div>
 
-    <div style="background:linear-gradient(180deg, rgba(255,107,44,0.1) 0%, transparent 100%);padding:40px 16px;text-align:center">
+    <div style="background:linear-gradient(180deg, rgba(0, 135, 90,0.1) 0%, transparent 100%);padding:40px 16px;text-align:center">
       <div style="font-size:12px;font-weight:900;color:var(--primary);letter-spacing:2px;margin-bottom:12px">RESULTADO FINAL</div>
       <div style="display:flex;align-items:center;justify-content:center;gap:20px">
         <div><div style="font-size:14px;font-weight:700;margin-bottom:4px;color:rgba(255,255,255,0.6)">${team.name}</div><div style="font-size:48px;font-weight:900;line-height:1">${g.homeScore}</div></div>
@@ -1865,7 +1865,7 @@ async function renderGameRecap(container, { gameId }) {
               <div style="font-size:24px;font-weight:900;color:#A855F7">${astPct}%</div>
               <div style="font-size:10px;font-weight:800;opacity:0.6;margin-top:4px">CANASTAS ASISTIDAS</div>
             </div>
-            <div class="stat-card" style="padding:16px;text-align:left;background:rgba(255,107,44,0.05);border:1px solid rgba(255,107,44,0.1)">
+            <div class="stat-card" style="padding:16px;text-align:left;background:rgba(0, 135, 90,0.05);border:1px solid rgba(0, 135, 90,0.1)">
               <div style="font-size:24px;font-weight:900;color:var(--primary)">${bPts}</div>
               <div style="font-size:10px;font-weight:800;opacity:0.6;margin-top:4px">PUNTOS DEL BANQUILLO</div>
             </div>
@@ -2017,7 +2017,7 @@ async function renderGameLiveViewOnly(container, { gameId, teamName }) {
       <div style="padding:0 16px">
         ${playersOn.length ? playersOn.map(p => `
           <div style="background:var(--glass);border:1px solid var(--glass-border);padding:14px;border-radius:16px;margin-bottom:10px;display:flex;align-items:center;gap:12px">
-            <div style="width:36px;height:36px;background:rgba(255,107,44,0.1);color:var(--primary);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900">#${p.number||'?'}</div>
+            <div style="width:36px;height:36px;background:rgba(0, 135, 90,0.1);color:var(--primary);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900">#${p.number||'?'}</div>
             <div style="flex:1">
                <div style="font-weight:700;font-size:15px">${p.name}</div>
                <div style="display:flex;gap:4px;margin-top:4px">
@@ -2164,7 +2164,7 @@ async function renderProfile(container) {
     </div>
     <div class="settings-list">
       <div class="settings-item">
-        <div class="settings-icon" style="background:rgba(255,107,44,0.1)">👤</div>
+        <div class="settings-icon" style="background:rgba(0, 135, 90,0.1)">👤</div>
         <div class="settings-text">
           <div class="settings-label">${u.name}</div>
           <div class="settings-desc">${u.email||'Sin correo'}</div>
@@ -2179,7 +2179,7 @@ async function renderProfile(container) {
       </div>
       ${u.guardian ? `
       <div class="settings-item">
-        <div class="settings-icon" style="background:rgba(255,107,44,0.05)">🛡️</div>
+        <div class="settings-icon" style="background:rgba(0, 135, 90,0.05)">🛡️</div>
         <div class="settings-text">
           <div class="settings-label">Tutor: ${u.guardian}</div>
           <div class="settings-desc">Tel: ${u.parentPhone}</div>
@@ -2476,7 +2476,7 @@ function roleLabelRaw(r) {
             </div>
           </div>
           
-          <div id="nuMinorField" style="display:none;margin-bottom:16px;background:rgba(255,107,44,0.05);padding:14px;border-radius:12px;border:1px solid rgba(255,107,44,0.2)">
+          <div id="nuMinorField" style="display:none;margin-bottom:16px;background:rgba(0, 135, 90,0.05);padding:14px;border-radius:12px;border:1px solid rgba(0, 135, 90,0.2)">
             <div style="font-size:11px;font-weight:900;color:var(--primary);margin-bottom:10px;text-transform:uppercase">Datos del representante (Menor de edad)</div>
             <div class="form-group" style="margin-bottom:12px">
               <label class="form-label" style="font-size:10px">NOMBRE DEL PADRE/MADRE/TUTOR</label>
@@ -2557,7 +2557,7 @@ function roleLabelRaw(r) {
             <select class="form-input" id="nuTeam" multiple style="height:120px;padding:8px">
                ${sortedTeams.map(t => `<option value="${t.id}">${t.name}</option>`).join('')}
             </select>
-            <div style="font-size:10px;color:rgba(255,107,44,0.7);margin-top:6px;font-weight:700">Selección múltiple activada 🖱️ (Mantén Ctrl/Cmd)</div>
+            <div style="font-size:10px;color:rgba(0, 135, 90,0.7);margin-top:6px;font-weight:700">Selección múltiple activada 🖱️ (Mantén Ctrl/Cmd)</div>
          `;
       } else {
          container.innerHTML = `
@@ -2735,7 +2735,7 @@ function roleLabelRaw(r) {
             <input class="form-input" id="euPhone" type="tel" value="${u.phone||''}" maxlength="9" oninput="validatePhone(this)" placeholder="6XXXXXXXX">
           </div>
 
-          <div id="euMinorField" style="display:${ageVal < 18 ? 'block' : 'none'};margin-bottom:16px;background:rgba(255,107,44,0.05);padding:14px;border-radius:12px;border:1px solid rgba(255,107,44,0.2)">
+          <div id="euMinorField" style="display:${ageVal < 18 ? 'block' : 'none'};margin-bottom:16px;background:rgba(0, 135, 90,0.05);padding:14px;border-radius:12px;border:1px solid rgba(0, 135, 90,0.2)">
             <div style="font-size:11px;font-weight:900;color:var(--primary);margin-bottom:10px;text-transform:uppercase">Datos del representante (Menor de edad)</div>
             <div class="form-group" style="margin-bottom:12px">
               <label class="form-label" style="font-size:10px">NOMBRE DEL PADRE/MADRE/TUTOR</label>
@@ -2792,7 +2792,7 @@ function roleLabelRaw(r) {
               </option>`;
             }).join('')}
           </select>
-          <div style="font-size:10px;color:rgba(255,107,44,0.7);margin-top:6px;font-weight:700">
+          <div style="font-size:10px;color:rgba(0, 135, 90,0.7);margin-top:6px;font-weight:700">
             Marcados con ✓ están asignados. Mantén Ctrl/Cmd para añadir/quitar.
           </div>
         `;
@@ -3559,7 +3559,7 @@ async function renderAdminNews(container) {
     selIcon = ic;
     document.querySelectorAll('.iconBtn').forEach(b => { b.style.borderColor='var(--glass-border)'; b.style.background='var(--glass)'; });
     btn.style.borderColor = 'var(--primary)';
-    btn.style.background  = 'rgba(255,107,44,0.12)';
+    btn.style.background  = 'rgba(0, 135, 90,0.12)';
   };
 
   window.publishNews = async () => {
@@ -3630,7 +3630,7 @@ async function renderAdminApprovals(container) {
       ${reqs.length ? reqs.map(r => `
         <div class="card" style="margin-bottom:16px;border:1px solid rgba(255,255,255,0.05);position:relative">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-            <span style="font-size:10px;font-weight:900;color:var(--primary);letter-spacing:1px;background:rgba(255,107,44,0.1);padding:4px 8px;border-radius:6px">${r.type}</span>
+            <span style="font-size:10px;font-weight:900;color:var(--primary);letter-spacing:1px;background:rgba(0, 135, 90,0.1);padding:4px 8px;border-radius:6px">${r.type}</span>
             <span style="font-size:10px;opacity:0.5">${r.timestamp?.toDate().toLocaleString() || ''}</span>
           </div>
           <div style="font-size:14px;font-weight:800;margin-bottom:8px">${r.name}</div>

@@ -1,30 +1,30 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
 
 :root {
-  --bg-deep: #060B18;
-  --bg-dark: #0D1425;
-  --bg-card: #162035;
-  --bg-card-2: #1E2D45;
-  --primary: #FF6B2C;
-  --primary-dark: #D4531B;
-  --primary-glow: rgba(255,107,44,0.25);
-  --secondary: #FFB800;
-  --accent: #00D4FF;
-  --text-1: #FFFFFF;
-  --text-2: #B0BEC5;
-  --text-3: #607080;
-  --success: #00E676;
-  --warning: #FFB300;
-  --danger: #FF4444;
-  --glass: rgba(255,255,255,0.04);
-  --glass-border: rgba(255,255,255,0.08);
+  --bg-deep: #F8FAFC;
+  --bg-dark: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --bg-card-2: #F1F5F9;
+  --primary: #00875A;
+  --primary-dark: #006241;
+  --primary-glow: rgba(0, 135, 90, 0.15);
+  --secondary: #10B981;
+  --accent: #34D399;
+  --text-1: #0F172A;
+  --text-2: #475569;
+  --text-3: #94A3B8;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+  --glass: rgba(0, 0, 0, 0.03);
+  --glass-border: rgba(0, 0, 0, 0.08);
   --radius-sm: 10px;
   --radius-md: 18px;
   --radius-lg: 26px;
-  --shadow-primary: 0 8px 32px rgba(255,107,44,0.35);
-  --shadow-card: 0 4px 20px rgba(0,0,0,0.5);
+  --shadow-primary: 0 8px 32px rgba(0, 135, 90, 0.25);
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.08);
   --nav-h: 72px;
-  --header-h: 60px;
+  --header-h: 64px;
   --font: 'Outfit', -apple-system, sans-serif;
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -51,9 +51,9 @@ body {
 .login-bg {
   min-height: 100vh;
   background:
-    radial-gradient(ellipse at 80% 10%, rgba(255,107,44,0.2) 0%, transparent 50%),
-    radial-gradient(ellipse at 20% 90%, rgba(255,107,44,0.1) 0%, transparent 50%),
-    linear-gradient(160deg, #060B18 0%, #0D1425 100%);
+    radial-gradient(ellipse at 80% 10%, rgba(0,135,90,0.1) 0%, transparent 50%),
+    radial-gradient(ellipse at 20% 90%, rgba(0,135,90,0.05) 0%, transparent 50%),
+    linear-gradient(160deg, #F8FAFC 0%, #E2E8F0 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -67,7 +67,7 @@ body {
   content: '';
   position: absolute;
   width: 300px; height: 300px;
-  border: 50px solid rgba(255,107,44,0.04);
+  border: 50px solid rgba(0,135,90,0.03);
   border-radius: 50%;
   top: -100px; right: -100px;
 }
@@ -76,20 +76,20 @@ body {
   content: '';
   position: absolute;
   width: 200px; height: 200px;
-  border: 40px solid rgba(255,107,44,0.04);
+  border: 40px solid rgba(0,135,90,0.03);
   border-radius: 50%;
   bottom: -60px; left: -60px;
 }
 
 .login-card {
-  background: rgba(22,32,53,0.95);
+  background: rgba(255,255,255,0.9);
   backdrop-filter: blur(24px);
-  border: 1px solid rgba(255,107,44,0.15);
+  border: 1px solid rgba(0,135,90,0.1);
   border-radius: 28px;
   padding: 40px 32px;
   width: 100%;
   max-width: 400px;
-  box-shadow: 0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04) inset;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.1), 0 0 0 1px rgba(255,255,255,1) inset;
   position: relative; z-index: 1;
 }
 
@@ -99,7 +99,7 @@ body {
   font-size: 64px;
   display: block;
   margin-bottom: 12px;
-  filter: drop-shadow(0 0 20px rgba(255,107,44,0.5));
+  filter: drop-shadow(0 0 20px rgba(0,135,90,0.3));
   animation: float 3s ease-in-out infinite;
 }
 
@@ -111,7 +111,7 @@ body {
 .logo-title {
   font-size: 28px;
   font-weight: 900;
-  background: linear-gradient(135deg, #FF6B2C, #FFB800);
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -134,7 +134,7 @@ body {
 
 .form-input {
   width: 100%;
-  background: rgba(255,255,255,0.05);
+  background: #FFFFFF;
   border: 1px solid var(--glass-border);
   border-radius: 14px;
   padding: 14px 16px;
@@ -176,7 +176,7 @@ body {
 
 
 select.form-input {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 14px center;
   background-size: 18px;
@@ -184,7 +184,7 @@ select.form-input {
 }
 
 select.form-input option {
-  background-color: var(--bg-dark);
+  background-color: #FFFFFF;
   color: var(--text-1);
   padding: 12px;
 }
@@ -197,8 +197,8 @@ select.form-input[multiple] {
 
 .form-input:focus {
   border-color: var(--primary);
-  background: rgba(255,107,44,0.06);
-  box-shadow: 0 0 0 3px rgba(255,107,44,0.12);
+  background: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(0, 135, 90, 0.1);
 }
 
 .form-input::placeholder { color: var(--text-3); }
@@ -219,7 +219,7 @@ select.form-input[multiple] {
   margin-top: 8px;
 }
 
-.btn-primary:active { transform: scale(0.97); box-shadow: 0 4px 16px rgba(255,107,44,0.3); }
+.btn-primary:active { transform: scale(0.97); box-shadow: 0 4px 16px rgba(0, 135, 90, 0.2); }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .login-info-box {
@@ -267,11 +267,11 @@ select.form-input[multiple] {
 
 .header-logo {
   width: 36px; height: 36px;
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
   border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
   font-size: 20px;
-  box-shadow: 0 4px 12px rgba(255,107,44,0.4);
+  box-shadow: 0 4px 12px rgba(0, 135, 90, 0.3);
   flex-shrink: 0;
 }
 
@@ -296,9 +296,10 @@ select.form-input[multiple] {
 .unread-badge {
   position: absolute; top: -3px; right: -3px;
   min-width: 16px; height: 16px;
-  background: var(--primary); border-radius: 99px;
+  background: var(--danger); border-radius: 99px;
   font-size: 9px; display: flex; align-items: center; justify-content: center;
   font-weight: 800; border: 2px solid var(--bg-dark); padding: 0 3px;
+  color: white;
 }
 
 .app-main {
@@ -316,8 +317,8 @@ select.form-input[multiple] {
   left: 0;
   width: 100%;
   height: var(--nav-h);
-  background: rgba(13, 20, 37, 0.85); /* Un pelín de transparencia */
-  backdrop-filter: blur(15px); /* Efecto cristal */
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(15px);
   -webkit-backdrop-filter: blur(15px);
   border-top: 1px solid var(--glass-border);
   display: flex;
@@ -346,7 +347,7 @@ select.form-input[multiple] {
 
 .nav-item.active .nav-icon {
   transform: scale(1.15);
-  filter: drop-shadow(0 0 8px rgba(255,107,44,0.5));
+  filter: drop-shadow(0 0 8px rgba(0, 135, 90, 0.3));
 }
 
 .nav-icon { font-size: 22px; transition: all 0.25s var(--ease); line-height: 1; }
@@ -420,7 +421,7 @@ select.form-input[multiple] {
   padding: 4px 10px; border-radius: 99px;
   font-size: 12px; font-weight: 700;
 }
-.tag-orange { background: rgba(255,107,44,0.15); color: var(--primary); }
+.tag-orange { background: rgba(0, 135, 90, 0.1); color: var(--primary); }
 .tag-green { background: rgba(0,230,118,0.12); color: var(--success); }
 .tag-blue { background: rgba(59,130,246,0.15); color: #60A5FA; }
 .tag-yellow { background: rgba(255,184,0,0.15); color: var(--secondary); }
@@ -468,10 +469,10 @@ select.form-input[multiple] {
 .team-icon {
   width: 52px; height: 52px;
   border-radius: 14px;
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
   display: flex; align-items: center; justify-content: center;
   font-size: 26px;
-  box-shadow: 0 4px 12px rgba(255,107,44,0.3);
+  box-shadow: 0 4px 12px rgba(0, 135, 90, 0.2);
   flex-shrink: 0;
 }
 
@@ -494,7 +495,7 @@ select.form-input[multiple] {
 .game-card:active { transform: scale(0.98); }
 
 .game-header {
-  background: rgba(255,107,44,0.07);
+  background: rgba(0, 135, 90, 0.05);
   border-bottom: 1px solid var(--glass-border);
   padding: 10px 16px;
   display: flex; align-items: center; justify-content: space-between;
@@ -538,9 +539,10 @@ select.form-input[multiple] {
 
 .message-avatar {
   width: 44px; height: 44px; border-radius: 14px;
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
   display: flex; align-items: center; justify-content: center;
   font-size: 22px; flex-shrink: 0;
+  color: white;
 }
 
 .message-content { flex: 1; min-width: 0; }
@@ -551,7 +553,7 @@ select.form-input[multiple] {
 
 /* Profile */
 .profile-header {
-  background: linear-gradient(160deg, rgba(255,107,44,0.15) 0%, transparent 60%);
+  background: linear-gradient(160deg, rgba(0, 135, 90, 0.08) 0%, transparent 60%);
   padding: 32px 16px 24px; text-align: center;
 }
 .profile-avatar {
@@ -560,8 +562,9 @@ select.form-input[multiple] {
   display: flex; align-items: center; justify-content: center;
   font-size: 38px; font-weight: 900;
   margin: 0 auto 16px;
-  border: 3px solid rgba(255,107,44,0.4);
-  box-shadow: 0 0 0 6px rgba(255,107,44,0.1);
+  border: 3px solid rgba(0, 135, 90, 0.2);
+  box-shadow: 0 0 0 6px rgba(0, 135, 90, 0.05);
+  color: white;
 }
 .profile-name { font-size: 22px; font-weight: 800; }
 .profile-role { color: var(--primary); font-size: 14px; font-weight: 600; margin-top: 4px; }
@@ -599,7 +602,7 @@ select.form-input[multiple] {
 /* Hero banner */
 .hero-banner {
   margin: 16px 16px 12px;
-  background: linear-gradient(135deg, var(--primary) 0%, #FF8C00 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
   border-radius: var(--radius-lg);
   padding: 24px;
   position: relative; overflow: hidden;
@@ -608,7 +611,7 @@ select.form-input[multiple] {
 .hero-banner::before {
   content: '🏀';
   position: absolute; right: -10px; bottom: -15px;
-  font-size: 110px; opacity: 0.15; transform: rotate(-20deg);
+  font-size: 110px; opacity: 0.1; transform: rotate(-20deg);
 }
 .hero-title { font-size: 21px; font-weight: 900; color: white; line-height: 1.2; }
 .hero-sub { font-size: 13px; color: rgba(255,255,255,0.8); margin-top: 4px; }
@@ -680,8 +683,8 @@ select.form-input[multiple] {
   -webkit-tap-highlight-color: transparent;
 }
 .tab-pill.active {
-  background: rgba(255,107,44,0.15);
-  border-color: rgba(255,107,44,0.4); color: var(--primary);
+  background: rgba(0, 135, 90, 0.1);
+  border-color: rgba(0, 135, 90, 0.3); color: var(--primary);
 }
 
 /* Scoreboard */
@@ -795,7 +798,7 @@ select.form-input[multiple] {
 }
 .stat-btn:active {
   transform: scale(0.91);
-  background: rgba(255,107,44,0.15);
+  background: rgba(0, 135, 90, 0.1);
   border-color: var(--primary);
 }
 
@@ -860,7 +863,7 @@ select.form-input[multiple] {
 .news-card:active { transform: scale(0.98); }
 .news-img {
   width: 100%; height: 130px; object-fit: cover;
-  background: linear-gradient(135deg, var(--primary) 0%, #FF8C00 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
   display: flex; align-items: center; justify-content: center; font-size: 60px;
 }
 .news-content { padding: 14px; }
@@ -873,8 +876,8 @@ select.form-input[multiple] {
   display: inline-flex; align-items: center;
   gap: 4px; padding: 4px 10px; border-radius: 99px;
   font-size: 12px; font-weight: 700;
-  background: rgba(255,107,44,0.1); color: var(--primary);
-  border: 1px solid rgba(255,107,44,0.2);
+  background: rgba(0, 135, 90, 0.1); color: var(--primary);
+  border: 1px solid rgba(0, 135, 90, 0.2);
 }
 
 /* Toggle */
@@ -946,11 +949,11 @@ select.form-input[multiple] {
   position: relative;
   -webkit-tap-highlight-color: transparent;
 }
-.psBtn:active { transform: scale(0.95); background: rgba(255,107,44,0.1); }
+.psBtn:active { transform: scale(0.95); background: rgba(0, 135, 90, 0.1); }
 .psBtn.active {
   border-color: var(--primary);
-  background: rgba(255,107,44,0.12);
-  box-shadow: 0 0 15px rgba(255,107,44,0.2);
+  background: rgba(0, 135, 90, 0.12);
+  box-shadow: 0 0 15px rgba(0, 135, 90, 0.2);
 }
 
 .psNum { font-size: 24px; font-weight: 900; color: var(--primary); line-height: 1; }
