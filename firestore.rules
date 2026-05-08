@@ -1,0 +1,183 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================
+    // HELPERS
+    // =========================
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function myUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function getUserRole() {
+      return myUserData().role;
+    }
+
+    function isAdmin() {
+      return isAuth() && getUserRole() == 'admin';
+    }
+
+    function isCoach() {
+      return isAuth() && getUserRole() in ['admin', 'coach'];
+    }
+
+    function myTeamIds() {
+      let d = myUserData();
+      let legacy = d.get('teamId', null);
+      return d.get('teamIds', legacy != null ? [legacy] : []);
+    }
+
+    // =========================
+    // HELPERS DE MENSAJES
+    // =========================
+
+    function amISender() {
+      return resource.data.senderId == request.auth.uid;
+    }
+
+    function isGlobalMessage() {
+      return resource.data.recipientId == 'all';
+    }
+
+    function isMessageToMe() {
+      return resource.data.recipientId == request.auth.uid;
+    }
+
+    function isMessageToAdmins() {
+      return resource.data.recipientId == 'admins' && isAdmin();
+    }
+
+    function isMessageToMyTeam() {
+      let rid = resource.data.recipientId;
+      return rid.size() > 5 &&
+             rid[0:5] == 'team_' &&
+             myTeamIds().hasAny([rid[5:rid.size()]]);
+    }
+
+    function isMessageToMyCoach() {
+      let rid = resource.data.recipientId;
+      return rid.size() > 6 &&
+             rid[0:6] == 'coach_' &&
+             getUserRole() == 'coach' &&
+             myTeamIds().hasAny([rid[6:rid.size()]]);
+    }
+
+    function validNewMessageShape() {
+      return request.resource.data.keys().hasAll([
+               'title', 'body', 'date', 'senderId', 'recipientId', 'recipientType'
+             ]) &&
+             request.resource.data.senderId == request.auth.uid &&
+             request.resource.data.title is string &&
+             request.resource.data.body is string &&
+             request.resource.data.recipientId is string &&
+             request.resource.data.recipientType is string;
+    }
+
+    function canAdminCreateMessage() {
+      return isAdmin() &&
+             request.resource.data.get('senderId', '') == request.auth.uid;
+    }
+
+    function canCoachCreateMessage() {
+      let to   = request.resource.data.recipientId;
+      let type = request.resource.data.recipientType;
+      return isAuth() &&
+             getUserRole() == 'coach' &&
+             validNewMessageShape() &&
+             (
+               (type == 'all'   && to == 'all') ||
+               (type == 'team'  &&
+                to.size() > 5   &&
+                to[0:5] == 'team_' &&
+                myTeamIds().hasAny([to[5:to.size()]])) ||
+               (type == 'user') ||
+               (type == 'admins' && to == 'admins')
+             );
+    }
+
+    function canRegularUserCreateMessage() {
+      let to   = request.resource.data.recipientId;
+      let type = request.resource.data.recipientType;
+      return isAuth() &&
+             !isCoach() &&
+             validNewMessageShape() &&
+             (
+               (type == 'admins' && to == 'admins') ||
+               (type == 'coach' &&
+                to.size() > 6   &&
+                to[0:6] == 'coach_' &&
+                myTeamIds().hasAny([to[6:to.size()]]))
+             );
+    }
+
+    // =========================
+    // USERS
+    // =========================
+    match /users/{userId} {
+      allow read:                   if isAuth() && (request.auth.uid == userId || isAdmin());
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /club/{docId} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    match /teams/{teamId} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    match /players/{playerId} {
+      allow read:  if isAuth();
+      allow write: if isCoach();
+    }
+
+    match /games/{gameId} {
+      allow read:  if isAuth();
+      allow write: if isCoach();
+    }
+
+    match /game_stats/{statId} {
+      allow read:  if isAuth();
+      allow write: if isCoach();
+    }
+
+    match /messages/{messageId} {
+      allow read: if isAuth() && (
+        isAdmin()           ||
+        amISender()         ||
+        isMessageToMe()     ||
+        isGlobalMessage()   ||
+        isMessageToMyTeam() ||
+        isMessageToAdmins() ||
+        isMessageToMyCoach()
+      );
+      allow create: if canAdminCreateMessage()       ||
+                       canCoachCreateMessage()       ||
+                       canRegularUserCreateMessage();
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || amISender();
+    }
+
+    match /news/{newsId} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    match /permissions/{teamId} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    match /seasons/{seasonId} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+  }
+}
