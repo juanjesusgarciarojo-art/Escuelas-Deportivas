@@ -1,7 +1,7 @@
 // Service Worker — Estadísticas Gallardas
 // Gestiona caché offline básica
 
-const CACHE_NAME = 'gallardas-v1';
+const CACHE_NAME = 'gallardas-v0.9';
 const ASSETS = [
   './',
   './index.html',
