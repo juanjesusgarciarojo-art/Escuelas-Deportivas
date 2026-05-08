@@ -2225,7 +2225,7 @@ async function renderProfile(container) {
         <div class="settings-icon" style="background:rgba(255,184,0,0.1)">ℹ️</div>
         <div class="settings-text">
           <div class="settings-label">Estadísticas Gallardas</div>
-          <div class="settings-desc">Versión 1.0.0 · Club Baloncesto Gallardas</div>
+          <div class="settings-desc">Versión 0.9 · Club Baloncesto Gallardas</div>
         </div>
       </div>
     </div>
